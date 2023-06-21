@@ -3065,6 +3065,11 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
         help="generate sample images every N epochs (overwrites n_steps) / 学習中のモデルで指定エポックごとにサンプル出力する（ステップ数指定を上書きします）",
     )
     parser.add_argument(
+        "--sample_before_training",
+        action="store_true",
+        help="sample before epoch 0 / ステップ0前のサンプル"    
+    )
+    parser.add_argument(
         "--sample_prompts", type=str, default=None, help="file for prompts to generate sample images / 学習中モデルのサンプル出力用プロンプトのファイル"
     )
     parser.add_argument(
@@ -4101,16 +4106,16 @@ def patch_accelerator_for_fp16_training(accelerator):
 def get_hidden_states(args: argparse.Namespace, input_ids, tokenizer, text_encoder, weight_dtype=None):
     # with no_token_padding, the length is not max length, return result immediately
     if input_ids.size()[-1] != tokenizer.model_max_length:
-        return text_encoder(input_ids)[0]
+        return text_encoder.accelerated()(input_ids)[0]
 
     # input_ids: b,n,77
     b_size = input_ids.size()[0]
     input_ids = input_ids.reshape((-1, tokenizer.model_max_length))  # batch_size*3, 77
 
     if args.clip_skip is None:
-        encoder_hidden_states = text_encoder(input_ids)[0]
+        encoder_hidden_states = text_encoder.accelerated()(input_ids)[0]
     else:
-        enc_out = text_encoder(input_ids, output_hidden_states=True, return_dict=True)
+        enc_out = text_encoder.accelerated()(input_ids, output_hidden_states=True, return_dict=True)
         encoder_hidden_states = enc_out["hidden_states"][-args.clip_skip]
         encoder_hidden_states = text_encoder.text_model.final_layer_norm(encoder_hidden_states)
 
@@ -4416,12 +4421,6 @@ def save_sd_model_on_epoch_end_or_stepwise_common(
             if os.path.exists(remove_out_dir):
                 print(f"removing old model: {remove_out_dir}")
                 shutil.rmtree(remove_out_dir)
-
-    if args.save_state:
-        if on_epoch_end:
-            save_and_remove_state_on_epoch_end(args, accelerator, epoch_no)
-        else:
-            save_and_remove_state_stepwise(args, accelerator, global_step)
 
 
 def save_and_remove_state_on_epoch_end(args: argparse.Namespace, accelerator, epoch_no):
