@@ -551,6 +551,18 @@ class ControlNetSubset(BaseSubset):
             return NotImplemented
         return self.image_dir == other.image_dir and self.conditioning_data_dir == other.conditioning_data_dir
 
+def shuffle_caption_by_separtor(caption, separator, caption_splitter):
+    splitted_parts = caption.split(separator)
+    splitted_parts = [c.strip().split(caption_splitter) for c in splitted_parts if c.strip()]
+    splitted_parts = [[c.strip() for c in parts if c.strip()] for parts in splitted_parts if parts]
+    for parts in splitted_parts:
+        random.shuffle(parts)
+    # returns first and others
+    if len(splitted_parts) == 1:
+        return splitted_parts[0], []
+    # flatten
+    flex_part = [c for parts in splitted_parts[1:] for c in parts]
+    return splitted_parts[0], flex_part
 
 class BaseDataset(torch.utils.data.Dataset):
     def __init__(
@@ -671,9 +683,12 @@ class BaseDataset(torch.utils.data.Dataset):
                     and subset.keep_tokens_separator
                     and subset.keep_tokens_separator in caption
                 ):
-                    fixed_part, flex_part = caption.split(subset.keep_tokens_separator, 1)
-                    fixed_tokens = [t.strip() for t in fixed_part.split(subset.caption_separator) if t.strip()]
-                    flex_tokens = [t.strip() for t in flex_part.split(subset.caption_separator) if t.strip()]
+                    if subset.shuffle_caption:
+                        fixed_part, flex_part = shuffle_caption_by_separtor(caption, subset.keep_tokens_separator, subset.caption_separator)
+                    else:
+                        fixed_part, flex_part = caption.split(subset.keep_tokens_separator, 1)
+                        fixed_tokens = [t.strip() for t in fixed_part.split(subset.caption_separator) if t.strip()]
+                        flex_tokens = [t.strip() for t in flex_part.split(subset.caption_separator) if t.strip()]
                 else:
                     tokens = [t.strip() for t in caption.strip().split(subset.caption_separator)]
                     flex_tokens = tokens[:]
