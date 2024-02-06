@@ -1,4 +1,5 @@
 import argparse
+import glob
 import os
 import json
 
@@ -35,6 +36,11 @@ def collate_fn_remove_corrupted(batch):
 
 
 def get_npz_filename(data_dir, image_key, is_full_path, recursive):
+    if not data_dir:
+        assert is_full_path, "data_dir is required if is_full_path is False / data_dirは必須です"
+        assert os.path.exists(image_key) and os.path.isabs(image_key), f"image_key must be full path / image_keyはフルパスである必要があります: {image_key}"
+        image_base_name = image_key.rsplit(".", 1)[0]
+        return image_base_name + ".npz"
     if is_full_path:
         base_name = os.path.splitext(os.path.basename(image_key))[0]
         relative_path = os.path.relpath(os.path.dirname(image_key), data_dir)
@@ -47,6 +53,23 @@ def get_npz_filename(data_dir, image_key, is_full_path, recursive):
     else:
         return os.path.join(data_dir, base_name) + ".npz"
 
+def split_dataset(image_paths, n_split, current_index):
+    """
+    Split dataset into n_split parts and return current_index part.
+    """
+    count = len(image_paths)
+    if count < n_split:
+        print(f"WARNING: dataset is too small for n_split / データセットが小さすぎます: {count} < {n_split}")
+        return image_paths
+    split_size = count // n_split
+    start = split_size * current_index
+    end = start + split_size
+    # last index, return [start:]
+    if current_index == n_split - 1:
+        end = count
+    print(f"split dataset with length {count} into {n_split} parts, current_index: {current_index}, start: {start}, end: {end}")
+    return image_paths[start:end]
+
 
 def main(args):
     # assert args.bucket_reso_steps % 8 == 0, f"bucket_reso_steps must be divisible by 8 / bucket_reso_stepは8で割り切れる必要があります"
@@ -56,18 +79,70 @@ def main(args):
         print(
             f"WARNING: bucket_reso_steps is not divisible by 32. It is not working with SDXL / bucket_reso_stepsが32で割り切れません。SDXLでは動作しません"
         )
-
-    train_data_dir_path = Path(args.train_data_dir)
-    image_paths: List[str] = [str(p) for p in train_util.glob_images_pathlib(train_data_dir_path, args.recursive)]
-    print(f"found {len(image_paths)} images.")
-
-    if os.path.exists(args.in_json):
-        print(f"loading existing metadata: {args.in_json}")
-        with open(args.in_json, "rt", encoding="utf-8") as f:
-            metadata = json.load(f)
+    metadata = {}
+    if args.train_data_dir:
+        train_data_dir_path = Path(args.train_data_dir)
     else:
-        print(f"no metadata / メタデータファイルがありません: {args.in_json}")
-        return
+        assert args.json_pattern, "train_data_dir or json_pattern is required / train_data_dirかjson_patternが必要です"
+        train_data_dir_path = None
+    if args.json_pattern:
+        json_list = glob.glob(args.json_pattern)
+        if len(json_list) == 0:
+            print(f"no json file found: {args.json_pattern}")
+            return
+        print(f"found {len(json_list)} json files.")
+        image_paths = []
+        for json_path in json_list:
+            print(f"loading metadata: {json_path}")
+            with open(json_path, "rt", encoding="utf-8") as f:
+                partial_metadata = json.load(f)
+                # key, value = image_path, tag
+                image_paths.extend(
+                    [key for key in partial_metadata.keys()]
+                )
+                metadata.update(
+                    {
+                        key : {"tag": value} for key, value in partial_metadata.items()
+                    }
+                )       
+    else:         
+        image_paths: List[str] = [str(p) for p in train_util.glob_images_pathlib(train_data_dir_path, args.recursive)]
+    if args.skip_existing:
+        print("skip_existing is enabled, so it will skip images if npz already exists / skip_existingが有効なので、npzが既に存在する画像はスキップします")
+        # check if npz exists'
+        if args.skip_caching_if_exists:
+            print("skip_caching_if_exists is enabled, this is only for caching latents, metadata won't be validated / skip_caching_if_existsが有効なので、latentのキャッシュのみをスキップします。メタデータは検証されません")
+            image_paths_result = []
+            for image_path in tqdm(image_paths, desc="checking npz existence"):
+                if not os.path.exists(image_path):
+                    continue
+                npz_file_name = get_npz_filename(args.train_data_dir, image_path, args.full_path, args.recursive)
+                if not os.path.exists(npz_file_name):
+                    image_paths_result.append(image_path)
+            image_paths = image_paths_result
+        else:
+            image_paths = [ip for ip in image_paths if os.path.exists(ip)] # filter out non-existing images
+    # split into n_split
+    if args.split_dataset:
+        # for using multi-gpu
+        n_split = args.n_split
+        current_index = args.current_index
+        print(f"splitting dataset into {n_split} parts, current_index: {current_index}")
+        image_paths = split_dataset(image_paths, n_split, current_index)
+        if args.json_pattern:
+            # get metadata for current image_paths
+            metadata = {
+                key: metadata[key] for key in image_paths
+            }
+    print(f"found {len(image_paths)} images, metadata: {len(metadata)}")
+    if not args.json_pattern:
+        if os.path.exists(args.in_json):
+            print(f"loading existing metadata: {args.in_json}")
+            with open(args.in_json, "rt", encoding="utf-8") as f:
+                metadata = json.load(f)
+        elif not metadata:
+            print(f"no metadata / メタデータファイルがありません: {args.in_json}")
+            return
 
     weight_dtype = torch.float32
     if args.mixed_precision == "fp16":
@@ -118,6 +193,8 @@ def main(args):
 
     bucket_counts = {}
     for data_entry in tqdm(data, smoothing=0.0):
+        if data_entry is None or len(data_entry) == 0:
+            continue
         if data_entry[0] is None:
             continue
 
@@ -128,7 +205,13 @@ def main(args):
             try:
                 image = Image.open(image_path)
                 if image.mode != "RGB":
-                    image = image.convert("RGB")
+                    # if RGBA, paste at white background
+                    if image.mode == "RGBA":
+                        white = Image.new("RGB", image.size, (255, 255, 255))
+                        white.paste(image, mask=image.split()[3])
+                        image = white
+                    else:
+                        image = image.convert("RGB")
             except Exception as e:
                 print(f"Could not load image path / 画像を読み込めません: {image_path}, error: {e}")
                 continue
@@ -196,10 +279,15 @@ def main(args):
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("train_data_dir", type=str, help="directory for train images / 学習画像データのディレクトリ")
-    parser.add_argument("in_json", type=str, help="metadata file to input / 読み込むメタデータファイル")
-    parser.add_argument("out_json", type=str, help="metadata file to output / メタデータファイル書き出し先")
-    parser.add_argument("model_name_or_path", type=str, help="model name or path to encode latents / latentを取得するためのモデル")
+    parser.add_argument("--train_data_dir", type=str, help="directory for train images / 学習画像データのディレクトリ", default=None)
+    parser.add_argument("--in_json", type=str, help="metadata file to input / 読み込むメタデータファイル", default=None)
+    parser.add_argument("--out_json", type=str, help="metadata file to output / メタデータファイル書き出し先")
+    parser.add_argument("--json_pattern", type=str, help="metadata file pattern to input / 読み込むメタデータファイルのパターン", default=None)
+    parser.add_argument("--split_dataset", action="store_true", help="split dataset into n_split parts / データセットをn_split個に分割する")
+    parser.add_argument("--n_split", type=int, default=1, help="number of split parts / 分割数")
+    parser.add_argument("--cuda", type=int, default=0, help="cuda device id / cudaデバイスID")
+    parser.add_argument("--current_index", type=int, default=0, help="current index of split parts / 現在の分割インデックス")
+    parser.add_argument("--model_name_or_path", type=str, help="model name or path to encode latents / latentを取得するためのモデル")
     parser.add_argument("--v2", action="store_true", help="not used (for backward compatibility) / 使用されません（互換性のため残してあります）")
     parser.add_argument("--batch_size", type=int, default=1, help="batch size in inference / 推論時のバッチサイズ")
     parser.add_argument(
@@ -242,6 +330,11 @@ def setup_parser() -> argparse.ArgumentParser:
         help="skip images if npz already exists (both normal and flipped exists if flip_aug is enabled) / npzが既に存在する画像をスキップする（flip_aug有効時は通常、反転の両方が存在する画像をスキップ）",
     )
     parser.add_argument(
+        "--skip_caching_if_exists",
+        action="store_true",
+        help="skip caching latents if npz already exists (metadata won't be validated) / npzが既に存在する場合はlatentのキャッシュをスキップする（メタデータは検証されません）",
+    )
+    parser.add_argument(
         "--recursive",
         action="store_true",
         help="recursively look for training tags in all child folders of train_data_dir / train_data_dirのすべての子フォルダにある学習タグを再帰的に探す",
@@ -254,4 +347,5 @@ if __name__ == "__main__":
     parser = setup_parser()
 
     args = parser.parse_args()
+    DEVICE = torch.device(f"cuda:{args.cuda}" if torch.cuda.is_available() else "cpu")
     main(args)
