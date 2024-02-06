@@ -184,16 +184,24 @@ def train(args):
         batch_size=1,
         shuffle=True,
         collate_fn=collator,
-        num_workers=n_workers,
+        num_workers=n_workers if not args.deepspeed else 1, # To avoid RuntimeError: DataLoader worker exited unexpectedly with exit code 1.
         persistent_workers=args.persistent_data_loader_workers,
     )
 
     # 学習ステップ数を計算する
     if args.max_train_epochs is not None:
-        args.max_train_steps = args.max_train_epochs * math.ceil(
-            len(train_dataloader) / accelerator.num_processes / args.gradient_accumulation_steps
-        )
-        accelerator.print(f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}")
+        if args.deepspeed:
+            args.max_train_steps = args.max_train_epochs * math.ceil(
+                len(train_dataloader) / args.gradient_accumulation_steps
+            )
+            accelerator.print(
+                f"[DeepSpeed] override steps not dividing by {accelerator.num_processes}. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
+            )
+        else:
+            args.max_train_steps = args.max_train_epochs * math.ceil(
+                len(train_dataloader) / accelerator.num_processes / args.gradient_accumulation_steps
+            )
+            accelerator.print(f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}")
 
     # データセット側にも学習ステップを送信
     train_dataset_group.set_max_train_steps(args.max_train_steps)
@@ -214,15 +222,36 @@ def train(args):
         text_encoder.to(weight_dtype)
 
     # acceleratorがなんかよろしくやってくれるらしい
-    if train_text_encoder:
-        unet, text_encoder, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-            unet, text_encoder, optimizer, train_dataloader, lr_scheduler
-        )
+    if args.deepspeed:
+        # wrapping model
+        import deepspeed
+        if args.offload_optimizer_device is not None:
+            accelerator.print('[DeepSpeed] start to manually build cpu_adam.')
+            deepspeed.ops.op_builder.CPUAdamBuilder().load()
+            accelerator.print('[DeepSpeed] building cpu_adam done.')
+        class DeepSpeedModel(torch.nn.Module): 
+            def __init__(self, unet, text_encoder) -> None:
+                super().__init__()
+                self.unet = unet
+                self.text_encoders = self.text_encoder = torch.nn.ModuleList(text_encoder)
+                
+            def get_models(self):
+                return self.unet, self.text_encoders
+        ds_model = DeepSpeedModel(unet, text_encoders)
+        ds_model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(ds_model, optimizer, train_dataloader, lr_scheduler)
+        # Now, ds_model is an instance of DeepSpeedEngine. 
+        unet, text_encoders = ds_model.get_models() # for compatiblility
+        text_encoder = text_encoders
     else:
-        unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, optimizer, train_dataloader, lr_scheduler)
+        if train_text_encoder:
+            unet, text_encoder, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+                unet, text_encoder, optimizer, train_dataloader, lr_scheduler
+            )
+        else:
+            unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, optimizer, train_dataloader, lr_scheduler)
 
-    if not train_text_encoder:
-        text_encoder.to(accelerator.device, dtype=weight_dtype)  # to avoid 'cpu' vs 'cuda' error
+        if not train_text_encoder:
+            text_encoder.to(accelerator.device, dtype=weight_dtype)  # to avoid 'cpu' vs 'cuda' error
 
     # 実験的機能：勾配も含めたfp16学習を行う　PyTorchにパッチを当ててfp16でのgrad scaleを有効にする
     if args.full_fp16:

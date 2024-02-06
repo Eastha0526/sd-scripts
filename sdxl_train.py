@@ -354,7 +354,7 @@ def train(args):
         batch_size=1,
         shuffle=True,
         collate_fn=collator,
-        num_workers=n_workers,
+        num_workers=n_workers if not args.deepspeed else 1, # To avoid RuntimeError: DataLoader worker exited unexpectedly with exit code 1.
         persistent_workers=args.persistent_data_loader_workers,
     )
 
@@ -389,18 +389,40 @@ def train(args):
         text_encoder1.to(weight_dtype)
         text_encoder2.to(weight_dtype)
 
-    # acceleratorがなんかよろしくやってくれるらしい
-    if train_unet:
-        unet = accelerator.prepare(unet)
-    if train_text_encoder1:
-        # freeze last layer and final_layer_norm in te1 since we use the output of the penultimate layer
-        text_encoder1.text_model.encoder.layers[-1].requires_grad_(False)
-        text_encoder1.text_model.final_layer_norm.requires_grad_(False)
-        text_encoder1 = accelerator.prepare(text_encoder1)
-    if train_text_encoder2:
-        text_encoder2 = accelerator.prepare(text_encoder2)
+    if args.deepspeed:
+        # Wrapping model for DeepSpeed
+        import deepspeed
+        if args.offload_optimizer_device is not None:
+            accelerator.print('[DeepSpeed] start to manually build cpu_adam.')
+            deepspeed.ops.op_builder.CPUAdamBuilder().load()
+            accelerator.print('[DeepSpeed] building cpu_adam done.')
 
-    optimizer, train_dataloader, lr_scheduler = accelerator.prepare(optimizer, train_dataloader, lr_scheduler)
+        class DeepSpeedModel(torch.nn.Module): 
+            def __init__(self, unet, text_encoder) -> None:
+                super().__init__()
+                self.unet = unet
+                self.text_encoders = self.text_encoder = torch.nn.ModuleList(text_encoder)
+                
+            def get_models(self):
+                return self.unet, self.text_encoders
+        text_encoders = [text_encoder1, text_encoder2]
+        ds_model = DeepSpeedModel(unet, text_encoders)
+        ds_model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(ds_model, optimizer, train_dataloader, lr_scheduler)
+        # Now, ds_model is an instance of DeepSpeedEngine. 
+        unet, text_encoders = ds_model.get_models() # for compatiblility
+        text_encoder1, text_encoder2 = text_encoder = text_encoders
+        training_models = [unet, text_encoder1, text_encoder2]
+    else: # acceleratorがなんかよろしくやってくれるらしい
+        if train_unet:
+            unet = accelerator.prepare(unet)
+        if train_text_encoder1:
+            # freeze last layer and final_layer_norm in te1 since we use the output of the penultimate layer
+            text_encoder1.text_model.encoder.layers[-1].requires_grad_(False)
+            text_encoder1.text_model.final_layer_norm.requires_grad_(False)
+            text_encoder1 = accelerator.prepare(text_encoder1)
+        if train_text_encoder2:
+            text_encoder2 = accelerator.prepare(text_encoder2)
+        optimizer, train_dataloader, lr_scheduler = accelerator.prepare(optimizer, train_dataloader, lr_scheduler)
 
     # TextEncoderの出力をキャッシュするときにはCPUへ移動する
     if args.cache_text_encoder_outputs:
@@ -474,10 +496,10 @@ def train(args):
         for step, batch in enumerate(train_dataloader):
             current_step.value = global_step
             with accelerator.accumulate(*training_models):
-                if "latents" in batch and batch["latents"] is not None:
-                    latents = batch["latents"].to(accelerator.device).to(dtype=weight_dtype)
-                else:
-                    with torch.no_grad():
+                with torch.no_grad(): # why this block differ within train_network.py?
+                    if "latents" in batch and batch["latents"] is not None:
+                        latents = batch["latents"].to(accelerator.device).to(dtype=weight_dtype)
+                    else:
                         # latentに変換
                         latents = vae.encode(batch["images"].to(vae_dtype)).latent_dist.sample().to(weight_dtype)
 
@@ -485,7 +507,7 @@ def train(args):
                         if torch.any(torch.isnan(latents)):
                             accelerator.print("NaN found in latents, replacing with zeros")
                             latents = torch.nan_to_num(latents, 0, out=latents)
-                latents = latents * sdxl_model_util.VAE_SCALE_FACTOR
+                    latents = latents * sdxl_model_util.VAE_SCALE_FACTOR
 
                 if "text_encoder_outputs1_list" not in batch or batch["text_encoder_outputs1_list"] is None:
                     input_ids1 = batch["input_ids"]
