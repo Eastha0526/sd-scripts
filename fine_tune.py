@@ -246,7 +246,7 @@ def train(args):
                 self.text_encoders = self.text_encoder = torch.nn.ModuleList(text_encoder)
             def get_models(self):
                 return self.unet, self.text_encoders
-        ds_model = DeepSpeedModel(unet, text_encoders)
+        ds_model = DeepSpeedModel(unet, text_encoder)
         ds_model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(ds_model, optimizer, train_dataloader, lr_scheduler)
         # Now, ds_model is an instance of DeepSpeedEngine. 
         unet, text_encoders = ds_model.get_models() # for compatiblility
