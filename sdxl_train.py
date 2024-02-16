@@ -657,7 +657,10 @@ def train(args):
                             vae,
                             logit_scale,
                             ckpt_info,
+                            save_state = False, # if only single gpu is used then it can be enabled
                         )
+                    # this should be called in all processes
+                    train_util.save_state_common(args, accelerator, epoch, on_epoch_end=False, global_step=global_step, save_state=True)
 
             current_loss = loss.detach().item()  # 平均なのでbatch sizeは関係ないはず
             if args.logging_dir is not None:
@@ -703,7 +706,10 @@ def train(args):
                     vae,
                     logit_scale,
                     ckpt_info,
+                    save_state = False, # if only single gpu is used then it can be enabled
                 )
+            # this should be called in all processes
+            train_util.save_state_common(args, accelerator, epoch, on_epoch_end=True, global_step=global_step, save_state=True)
 
         sdxl_train_util.sample_images(
             accelerator,

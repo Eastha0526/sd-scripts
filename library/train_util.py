@@ -4313,6 +4313,7 @@ def save_sd_model_on_epoch_end_or_stepwise(
     text_encoder,
     unet,
     vae,
+    save_state: bool = False,
 ):
     def sd_saver(ckpt_file, epoch_no, global_step):
         sai_metadata = get_sai_model_spec(None, args, False, False, False, is_stable_diffusion_ckpt=True)
@@ -4336,6 +4337,7 @@ def save_sd_model_on_epoch_end_or_stepwise(
         global_step,
         sd_saver,
         diffusers_saver,
+        save_state,
     )
 
 
@@ -4350,6 +4352,7 @@ def save_sd_model_on_epoch_end_or_stepwise_common(
     global_step: int,
     sd_saver,
     diffusers_saver,
+    save_state: bool = False,
 ):
     if on_epoch_end:
         epoch_no = epoch + 1
@@ -4416,13 +4419,19 @@ def save_sd_model_on_epoch_end_or_stepwise_common(
             if os.path.exists(remove_out_dir):
                 print(f"removing old model: {remove_out_dir}")
                 shutil.rmtree(remove_out_dir)
+    if save_state:
+        if args.save_state:
+            if on_epoch_end:
+                save_and_remove_state_on_epoch_end(args, accelerator, epoch_no)
+            else:
+                save_and_remove_state_stepwise(args, accelerator, global_step)
 
-    if args.save_state:
+def save_state_common(args: argparse.Namespace, accelerator, epoch: int, on_epoch_end:bool, global_step: int, save_state: bool):
+    if save_state and args.save_state:
         if on_epoch_end:
-            save_and_remove_state_on_epoch_end(args, accelerator, epoch_no)
+            save_and_remove_state_on_epoch_end(args, accelerator, epoch)
         else:
             save_and_remove_state_stepwise(args, accelerator, global_step)
-
 
 def save_and_remove_state_on_epoch_end(args: argparse.Namespace, accelerator, epoch_no):
     model_name = default_if_none(args.output_name, DEFAULT_EPOCH_NAME)
