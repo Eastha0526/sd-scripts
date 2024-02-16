@@ -274,6 +274,7 @@ def save_sd_model_on_epoch_end_or_stepwise(
     vae,
     logit_scale,
     ckpt_info,
+    save_state: bool = False,
 ):
     def sd_saver(ckpt_file, epoch_no, global_step):
         sai_metadata = train_util.get_sai_model_spec(None, args, True, False, False, is_stable_diffusion_ckpt=True)
@@ -314,6 +315,7 @@ def save_sd_model_on_epoch_end_or_stepwise(
         global_step,
         sd_saver,
         diffusers_saver,
+        save_state
     )
 
 
