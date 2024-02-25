@@ -1576,6 +1576,7 @@ class FineTuningDataset(BaseDataset):
                 print(f"loading existing metadata: {subset.metadata_file}")
                 with open(subset.metadata_file, "rt", encoding="utf-8") as f:
                     metadata = json.load(f)
+                print(f"loaded {len(metadata)} entries from {subset.metadata_file}")
             else:
                 raise ValueError(f"no metadata / メタデータファイルがありません: {subset.metadata_file}")
 
@@ -1584,7 +1585,7 @@ class FineTuningDataset(BaseDataset):
                 continue
 
             tags_list = []
-            for image_key, img_md in metadata.items():
+            for image_key, img_md in tqdm(metadata.items(), desc=f"processing {subset.metadata_file}"):
                 # path情報を作る
                 abs_path = None
 
@@ -1593,6 +1594,7 @@ class FineTuningDataset(BaseDataset):
                     abs_path = image_key
                 else:
                     # わりといい加減だがいい方法が思いつかん
+                    print(f"image not found: {image_key}")
                     paths = glob_images(subset.image_dir, image_key)
                     if len(paths) > 0:
                         abs_path = paths[0]
@@ -1610,6 +1612,8 @@ class FineTuningDataset(BaseDataset):
 
                 caption = img_md.get("caption")
                 tags = img_md.get("tags")
+                if caption is None and tags is None:
+                    raise ValueError(f"no caption and tags / キャプションもタグもありません: {image_key}")
                 if caption is None:
                     caption = tags
                 elif tags is not None and len(tags) > 0:
