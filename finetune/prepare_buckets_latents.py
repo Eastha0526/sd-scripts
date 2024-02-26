@@ -135,7 +135,7 @@ def main(args):
                 key: metadata[key] for key in image_paths
             }
     print(f"found {len(image_paths)} images, metadata: {len(metadata)}")
-    if not args.json_pattern:
+    if not args.json_pattern and not args.train_data_dir:
         if os.path.exists(args.in_json):
             print(f"loading existing metadata: {args.in_json}")
             with open(args.in_json, "rt", encoding="utf-8") as f:
@@ -271,9 +271,10 @@ def main(args):
     print(f"mean ar error: {np.mean(img_ar_errors)}")
 
     # metadataを書き出して終わり
-    print(f"writing metadata: {args.out_json}")
-    with open(args.out_json, "wt", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
+    if args.out_json:
+        print(f"writing metadata: {args.out_json}")
+        with open(args.out_json, "wt", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2)
     print("done!")
 
 
@@ -281,7 +282,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--train_data_dir", type=str, help="directory for train images / 学習画像データのディレクトリ", default=None)
     parser.add_argument("--in_json", type=str, help="metadata file to input / 読み込むメタデータファイル", default=None)
-    parser.add_argument("--out_json", type=str, help="metadata file to output / メタデータファイル書き出し先")
+    parser.add_argument("--out_json", type=str, help="metadata file to output / メタデータファイル書き出し先", default=None)
     parser.add_argument("--json_pattern", type=str, help="metadata file pattern to input / 読み込むメタデータファイルのパターン", default=None)
     parser.add_argument("--split_dataset", action="store_true", help="split dataset into n_split parts / データセットをn_split個に分割する")
     parser.add_argument("--n_split", type=int, default=1, help="number of split parts / 分割数")
