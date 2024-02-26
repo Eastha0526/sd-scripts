@@ -576,6 +576,7 @@ class ControlNetSubset(BaseSubset):
 
 def shuffle_caption_by_separtor(caption, separator, caption_splitter):
     splitted_parts = caption.split(separator)
+    random.shuffle(splitted_parts)
     splitted_parts = [c.strip().split(caption_splitter) for c in splitted_parts if c.strip()]
     splitted_parts = [[c.strip() for c in parts if c.strip()] for parts in splitted_parts if parts]
     for parts in splitted_parts:
