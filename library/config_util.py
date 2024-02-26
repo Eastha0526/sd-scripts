@@ -116,6 +116,7 @@ class FineTuningDatasetParams(BaseDatasetParams):
     max_bucket_reso: int = 1024
     bucket_reso_steps: int = 64
     bucket_no_upscale: bool = False
+    multi_captions: bool = False
 
 
 @dataclass

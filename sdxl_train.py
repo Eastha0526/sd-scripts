@@ -143,6 +143,7 @@ def train(args):
                 user_config = {
                     "datasets": [
                         {
+                            "multi_captions" : args.multi_captions,
                             "subsets": [
                                 {
                                     "image_dir": args.train_data_dir,
