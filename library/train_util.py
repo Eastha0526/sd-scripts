@@ -376,6 +376,7 @@ class BaseSubset:
         caption_suffix: Optional[str],
         token_warmup_min: int,
         token_warmup_step: Union[float, int],
+        multi_captions: bool = False,
     ) -> None:
         self.image_dir = image_dir
         self.num_repeats = num_repeats
@@ -478,6 +479,7 @@ class FineTuningSubset(BaseSubset):
         caption_suffix,
         token_warmup_min,
         token_warmup_step,
+        multi_captions: bool = False,
     ) -> None:
         assert metadata_file is not None, "metadata_file must be specified / metadata_fileは指定が必須です"
 
@@ -499,6 +501,7 @@ class FineTuningSubset(BaseSubset):
             caption_suffix,
             token_warmup_min,
             token_warmup_step,
+            multi_captions
         )
 
         self.metadata_file = metadata_file
