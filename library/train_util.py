@@ -759,6 +759,8 @@ class BaseDataset(torch.utils.data.Dataset):
                 flex_tokens = dropout_tags(flex_tokens)
 
                 caption = ", ".join(fixed_tokens + flex_tokens)
+                if random.Random().random() < 0.00001:
+                    print(caption)
 
             # textual inversion対応
             for str_from, str_to in self.replacements.items():
