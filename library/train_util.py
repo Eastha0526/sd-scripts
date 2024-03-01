@@ -720,8 +720,8 @@ class BaseDataset(torch.utils.data.Dataset):
                         fixed_part, flex_part = shuffle_caption_by_separtor(caption, subset.keep_tokens_separator, subset.caption_separator)
                     else:
                         fixed_part, flex_part = caption.split(subset.keep_tokens_separator, 1)
-                        fixed_tokens = [t.strip() for t in fixed_part.split(subset.caption_separator) if t.strip()]
-                        flex_tokens = [t.strip() for t in flex_part.split(subset.caption_separator) if t.strip()]
+                    fixed_tokens = [t.strip() for t in fixed_part.split(subset.caption_separator) if t.strip()]
+                    flex_tokens = [t.strip() for t in flex_part.split(subset.caption_separator) if t.strip()]
                 else:
                     tokens = [t.strip() for t in caption.strip().split(subset.caption_separator)]
                     flex_tokens = tokens[:]
