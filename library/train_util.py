@@ -770,7 +770,8 @@ class BaseDataset(torch.utils.data.Dataset):
                         caption = str_to
                 else:
                     caption = caption.replace(str_from, str_to)
-
+        if not is_drop_out and subset.caption_tag_dropout_rate == 0 and subset.token_warmup_step == 0:
+            assert caption, "caption should not be empty if not dropout, warmup, or tag dropout"
         return caption
 
     def get_input_ids(self, caption, tokenizer=None):
