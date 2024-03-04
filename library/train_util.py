@@ -742,7 +742,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
                 def dropout_tags(tokens):
                     # drop until token length gets smaller than 225 (hardcoded here)
-                    if len(tokens) <= 225:
+                    if len(tokens) > 225:
                         while len(tokens) > 225:
                             tokens.pop(random.randint(0, len(tokens) - 1))
                     if subset.caption_tag_dropout_rate <= 0:
