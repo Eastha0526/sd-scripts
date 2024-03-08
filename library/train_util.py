@@ -4634,7 +4634,8 @@ def get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents):
     # Add noise to the latents according to the noise magnitude at each timestep
     # (this is the forward diffusion process)
     if args.ip_noise_gamma:
-        noisy_latents = noise_scheduler.add_noise(latents, noise + args.ip_noise_gamma * torch.randn_like(latents), timesteps)
+        rand_range = random.random() # this prevents denosing attack assuming some uniform gaussian noise
+        noisy_latents = noise_scheduler.add_noise(latents, noise + rand_range * args.ip_noise_gamma * torch.randn_like(latents), timesteps)
     else:
         noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
