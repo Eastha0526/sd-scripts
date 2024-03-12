@@ -725,16 +725,97 @@ class BaseDataset(torch.utils.data.Dataset):
                     flex_tokens = flex_tokens[:tokens_len]
 
                 def dropout_tags(tokens):
-                    # drop until token length gets smaller than 225 (hardcoded here)
-                    if len(tokens) > 225:
-                        while len(tokens) > 225:
+                    # drop until token length gets smaller than 300 (hardcoded here)
+                    if len(tokens) > 300:
+                        while len(tokens) > 300:
                             tokens.pop(random.randint(0, len(tokens) - 1))
                     if subset.caption_tag_dropout_rate <= 0:
                         return tokens
                     l = []
-                    for token in tokens:
-                        if random.random() >= subset.caption_tag_dropout_rate:
-                            l.append(token)
+                    # 20% chance to drop until 50% of the tokens or until token count < 10 and add "very simple caption" instead
+                    # 30% chance to drop until 30% of the tokens and add "simple caption" instead
+                    # dropout_rate chance to drop until 10% of the tokens
+                    # if token count is larger than 50, add "detailed caption"
+                    no_dropout_tokens = [
+                        "low ",
+                        "lineart",
+                        "background",
+                        "out ",
+                        " art",
+                        " focus",
+                        " angle",
+                        " shot",
+                        " view",
+                        "close up",
+                        "from ",
+                        " body",
+                        "multiple",
+                        "monochrome",
+                        "artifact",
+                        "lowres",
+                        "koma",
+                        "pov",
+                        "censor",
+                        "upside" # these are critical tags for image comprehension
+                        "nude", # we don't want to drop these tags for NSFW images, for controllability
+                        "nake",
+                        "guro",
+                        "scat",
+                        "gore",
+                        "cover", # now some scan / copyrighted material
+                        "manga",
+                        "comic",
+                        "letterbox",
+                        "watermark",
+                        "scan",
+                        "doujin",
+                        "anatomical nonsense", #for better body part recognition
+                        "bad hands",
+                        "bad feet",
+                        "bad proportions",
+                        "quality",
+                        "bad aspect",
+                        "extra digits",
+                        "bad reflection",
+                        "artistic",
+                        "poorly drawn",
+                        "chromatic",
+                        "chiaroscuro",
+                        " medium",
+                        "cropped",
+                        "tomboy", # these are some case that model might be confused
+                        "trap",
+                        "tomgirl",
+                        "crossdressing",
+                    ] # The tokens that contains this will not be dropped
+                    len_tokens = len(tokens)
+                    if len_tokens < 10:
+                        l.append("extremely simple caption")
+                        return tokens
+                    if random.random() < 0.2:
+                        target_tokens = max(10, len_tokens // 2)
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        if len(l) <= 50:
+                            l.append("very simple caption")
+                    elif random.random() < 0.3:
+                        target_tokens = max(10, int(len_tokens * 0.7))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        if len(l) <= 50:
+                            l.append("simple caption")
+                    else:
+                        target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate)))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                    if len(l) > 50:
+                        l += ["detailed caption"]
                     return l
 
                 if subset.shuffle_caption:
