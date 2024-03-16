@@ -835,8 +835,8 @@ class BaseDataset(torch.utils.data.Dataset):
                         l += ["detailed caption"]
                     return l
 
-                if subset.shuffle_caption:
-                    random.shuffle(flex_tokens)
+                #if subset.shuffle_caption:
+                #    random.shuffle(flex_tokens)
 
                 flex_tokens = dropout_tags(flex_tokens)
 
