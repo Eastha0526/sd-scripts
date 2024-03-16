@@ -810,12 +810,12 @@ class BaseDataset(torch.utils.data.Dataset):
                         if len(l) <= 50:
                             l.append("simple caption")
                     else:
-                        target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate)))
+                        target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
-                    if len(l) > 50:
+                    if len(l) > 20:
                         l += ["detailed caption"]
                     return l
 
