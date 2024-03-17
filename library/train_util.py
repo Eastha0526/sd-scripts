@@ -804,6 +804,9 @@ class BaseDataset(torch.utils.data.Dataset):
                         "tomgirl",
                         "crossdressing",
                         " caption", #prevent the model from dropping the caption description
+                        "girl", # gender / persons are important
+                        "boy",
+                        "other"
                     ] # The tokens that contains this will not be dropped
                     len_tokens = len(tokens)
                     if len_tokens < 10:
