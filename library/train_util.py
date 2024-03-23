@@ -755,26 +755,16 @@ class BaseDataset(torch.utils.data.Dataset):
                     no_dropout_tokens = [
                         "low ",
                         "lineart",
-                        "background",
-                        "out ",
                         " art",
-                        " focus",
-                        " angle",
-                        " shot",
-                        " view",
-                        "close up",
                         "from ",
                         " body",
                         "multiple",
-                        "monochrome",
                         "artifact",
                         "lowres",
                         "koma",
                         "pov",
                         "censor",
                         "upside" # these are critical tags for image comprehension
-                        "nude", # we don't want to drop these tags for NSFW images, for controllability
-                        "nake",
                         "guro",
                         "scat",
                         "gore",
@@ -803,14 +793,11 @@ class BaseDataset(torch.utils.data.Dataset):
                         "trap",
                         "tomgirl",
                         "crossdressing",
-                        " caption", #prevent the model from dropping the caption description
+                        "androgynous",
+                        "futa", 
                         "girl", # gender / persons are important
                         "boy",
-                        "other",
-                        "general",
-                        "sensitive",
-                        "explicit",
-                        "questionable", # do not drop rating
+                        "other"
                     ] # The tokens that contains this will not be dropped
                     len_tokens = len(tokens)
                     if len_tokens < 10:
