@@ -5057,7 +5057,7 @@ def sample_image_inference(
     i: int = prompt_dict["enum"]
     img_filename = f"{'' if args.output_name is None else args.output_name + '_'}{num_suffix}_{i:02d}_{ts_str}{seed_suffix}.png"
     image.save(os.path.join(save_dir, img_filename))
-    return img_filename
+    return os.path.join(save_dir, img_filename)
 
 
 # endregion
