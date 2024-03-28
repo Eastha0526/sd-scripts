@@ -4954,7 +4954,7 @@ def sample_images_common(
                     )]
         try:
             import wandb
-            wandb.log({f"sample_{i}" : wandb.Image(Image.open(image_path)) for i, image_path in enumerate(image_paths), commit=False}, commit=False)
+            wandb.log({f"sample_{i}" : wandb.Image(Image.open(image_path)) for i, image_path in enumerate(image_paths)}, commit=False)
         except:
             pass
 
