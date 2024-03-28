@@ -4945,13 +4945,18 @@ def sample_images_common(
         per_process_prompts = []  # list of lists
         for i in range(distributed_state.num_processes):
             per_process_prompts.append(prompts[i :: distributed_state.num_processes])
-
+        image_paths = []
         with torch.no_grad():
             with distributed_state.split_between_processes(per_process_prompts) as prompt_dict_lists:
                 for prompt_dict in prompt_dict_lists[0]:
-                    sample_image_inference(
+                    image_paths += [sample_image_inference(
                         accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
-                    )
+                    )]
+        try:
+            import wandb
+            wandb.log({f"sample_{i}" : wandb.Image(Image.open(image_path)) for i, image_path in enumerate(image_paths), commit=False}, commit=False)
+        except:
+            pass
 
     # clear pipeline and cache to reduce vram usage
     del pipeline
@@ -5049,18 +5054,7 @@ def sample_image_inference(
     i: int = prompt_dict["enum"]
     img_filename = f"{'' if args.output_name is None else args.output_name + '_'}{num_suffix}_{i:02d}_{ts_str}{seed_suffix}.png"
     image.save(os.path.join(save_dir, img_filename))
-
-    # wandb有効時のみログを送信
-    try:
-        wandb_tracker = accelerator.get_tracker("wandb")
-        try:
-            import wandb
-        except ImportError:  # 事前に一度確認するのでここはエラー出ないはず
-            raise ImportError("No wandb / wandb がインストールされていないようです")
-        loggable_prompt = "".join(x for x in prompt if x.isalnum())
-        wandb_tracker.log({f"{loggable_prompt}": wandb.Image(image)})
-    except:  # wandb 無効時
-        pass
+    return img_filename
 
 
 # endregion
