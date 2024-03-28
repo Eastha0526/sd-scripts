@@ -30,6 +30,7 @@ import subprocess
 from io import BytesIO
 import toml
 
+from functools import cache
 from tqdm import tqdm
 
 import torch
@@ -84,6 +85,16 @@ TOKENIZER_PATH = "openai/clip-vit-large-patch14"
 V2_STABLE_DIFFUSION_PATH = "stabilityai/stable-diffusion-2"  # ここからtokenizerだけ使う v2とv2.1はtokenizer仕様は同じ
 
 HIGH_VRAM = False
+
+@cache
+def listdir(directory):
+    parent_dir = pathlib.Path(directory).parent
+    return [parent_dir / f for f in os.listdir(parent_dir)]
+
+def path_exists(target_dir: str) -> bool:
+    if target_dir in listdir(target_dir):
+        return True
+    return False
 
 # checkpointファイル名
 EPOCH_STATE_NAME = "{}-{:06d}-state"
@@ -1604,7 +1615,7 @@ class FineTuningDataset(BaseDataset):
                 abs_path = None
 
                 # まず画像を優先して探す
-                if os.path.exists(image_key):
+                if path_exists(image_key):
                     abs_path = image_key
                 else:
                     # わりといい加減だがいい方法が思いつかん
@@ -1614,11 +1625,11 @@ class FineTuningDataset(BaseDataset):
 
                 # なければnpzを探す
                 if abs_path is None:
-                    if os.path.exists(os.path.splitext(image_key)[0] + ".npz"):
+                    if path_exists(os.path.splitext(image_key)[0] + ".npz"):
                         abs_path = os.path.splitext(image_key)[0] + ".npz"
                     else:
                         npz_path = os.path.join(subset.image_dir, image_key + ".npz")
-                        if os.path.exists(npz_path):
+                        if path_exists(npz_path):
                             abs_path = npz_path
 
                 assert abs_path is not None, f"no image / 画像がありません: {image_key}"
@@ -2004,7 +2015,7 @@ class DatasetGroup(torch.utils.data.ConcatDataset):
 def is_disk_cached_latents_is_expected(reso, npz_path: str, flip_aug: bool):
     expected_latents_size = (reso[1] // 8, reso[0] // 8)  # bucket_resoはWxHなので注意
 
-    if not os.path.exists(npz_path):
+    if not path_exists(npz_path):
         return False
 
     npz = np.load(npz_path)
