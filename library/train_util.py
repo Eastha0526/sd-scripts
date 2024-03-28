@@ -88,11 +88,12 @@ HIGH_VRAM = False
 
 @cache
 def listdir(directory):
-    parent_dir = pathlib.Path(directory).parent
-    return [parent_dir / f for f in os.listdir(parent_dir)]
+    return os.listdir(directory)
 
 def path_exists(target_dir: str) -> bool:
-    if target_dir in listdir(target_dir):
+    file_basename = os.path.basename(target_dir)
+    parent_dir = os.path.dirname(target_dir)
+    if file_basename in listdir(parent_dir):
         return True
     return False
 
