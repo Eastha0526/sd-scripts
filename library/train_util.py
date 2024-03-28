@@ -1610,7 +1610,7 @@ class FineTuningDataset(BaseDataset):
                 continue
 
             tags_list = []
-            for image_key, img_md in metadata.items():
+            for image_key, img_md in tqdm(metadata.items()):
                 # path情報を作る
                 abs_path = None
 
