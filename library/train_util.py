@@ -91,6 +91,7 @@ def listdir(directory):
     return os.listdir(directory)
 
 def path_exists(target_dir: str) -> bool:
+    return True #os.path.exists(target_dir)
     file_basename = os.path.basename(target_dir)
     parent_dir = os.path.dirname(target_dir)
     if file_basename in listdir(parent_dir):
@@ -1750,7 +1751,7 @@ class FineTuningDataset(BaseDataset):
     def image_key_to_npz_file(self, subset: FineTuningSubset, image_key):
         base_name = os.path.splitext(image_key)[0]
         npz_file_norm = base_name + ".npz"
-
+        return npz_file_norm, None # hardcode
         if os.path.exists(npz_file_norm):
             # image_key is full path
             npz_file_flip = base_name + "_flip.npz"
