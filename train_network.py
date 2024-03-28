@@ -164,7 +164,7 @@ class NetworkTrainer:
                     )
             else:
                 if use_dreambooth_method:
-                    print("Using DreamBooth method.")
+                    print("Using DreamBooth method.", args.train_data_dir, args.reg_data_dir)
                     user_config = {
                         "datasets": [
                             {
@@ -174,6 +174,7 @@ class NetworkTrainer:
                             }
                         ]
                     }
+                    print("DreamBooth config:", user_config)
                 else:
                     print("Training with captions.")
                     user_config = {
