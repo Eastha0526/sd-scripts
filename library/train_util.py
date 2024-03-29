@@ -5137,7 +5137,7 @@ def sample_images_common(
 def get_all_paths_like_imagepaths_by_time(image_path):
     file_basename = os.path.basename(image_path).split(".")[0]
     timestamp_str = file_basename.split("_")[-2]
-    original_timestamp = datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
+    original_timestamp = datetime.datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
     
     front_fixed_part = "_".join(file_basename.split("_")[:-3])
 
@@ -5146,7 +5146,7 @@ def get_all_paths_like_imagepaths_by_time(image_path):
             front_fixed_part = "_".join(file_basename.split("_")[:-3])
             if front_fixed_part in file:
                 timestamp_str = file.split("_")[-2]
-                timestamp = datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
+                timestamp = datetime.datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
                 # allow 60-second difference
                 if abs((timestamp - original_timestamp).total_seconds()) < 60:
                     yield os.path.join(root, file)
