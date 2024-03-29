@@ -85,8 +85,7 @@ logger_logged_lines = 0
 def log_every(messages, n):
     global logger_logged_lines
     if logger_logged_lines % n == 0:
-        for message in messages:
-            logger.info(message)
+       logger.info(messages)
     logger_logged_lines += 1
 
 # Tokenizer: checkpointから読み込むのではなくあらかじめ提供されているものを使う
