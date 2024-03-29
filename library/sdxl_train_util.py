@@ -27,47 +27,37 @@ TOKENIZER2_PATH = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
 def load_target_model(args, accelerator:Accelerator, model_version: str, weight_dtype):
     # load models for each process
     model_dtype = match_mixed_precision(args, weight_dtype)  # prepare fp16/bf16
-    model_wait_called = False
-    for pi in range(accelerator.state.num_processes):
-        if pi == accelerator.state.process_index:
-            logger.info(f"loading model for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
-            start_time = time.time()
-            (
-                load_stable_diffusion_format,
-                text_encoder1,
-                text_encoder2,
-                vae,
-                unet,
-                logit_scale,
-                ckpt_info,
-            ) = _load_target_model(
-                args.pretrained_model_name_or_path,
-                args.vae,
-                model_version,
-                weight_dtype,
-                accelerator.device if args.lowram else "cpu",
-                model_dtype,
-            )
+    logger.info(f"loading model for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
+    start_time = time.time()
+    (
+        load_stable_diffusion_format,
+        text_encoder1,
+        text_encoder2,
+        vae,
+        unet,
+        logit_scale,
+        ckpt_info,
+    ) = _load_target_model(
+        args.pretrained_model_name_or_path,
+        args.vae,
+        model_version,
+        weight_dtype,
+        accelerator.device if args.lowram else "cpu",
+        model_dtype,
+    )
 
-            # work on low-ram device
-            if args.lowram:
-                text_encoder1.to(accelerator.device)
-                text_encoder2.to(accelerator.device)
-                unet.to(accelerator.device)
-                vae.to(accelerator.device)
+    # work on low-ram device
+    if args.lowram:
+        text_encoder1.to(accelerator.device)
+        text_encoder2.to(accelerator.device)
+        unet.to(accelerator.device)
+        vae.to(accelerator.device)
 
-            clean_memory_on_device(accelerator.device)
-            logger.info(f"model loaded in {time.time() - start_time:.2f} sec for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
-            model_wait_called = True
-        else:
-            logger.info(f"Skipping {pi} since it is not the local process {accelerator.state.process_index}/{accelerator.state.num_processes}")
-    if not model_wait_called:
-        raise ValueError(f"Model loading is not called in process {accelerator.state.process_index}/{accelerator.state.num_processes}")
-    logger.info(f"Waiting in process {accelerator.state.process_index}/{accelerator.state.num_processes}")
+    clean_memory_on_device(accelerator.device)
+    logger.info(f"model loaded in {time.time() - start_time:.2f} sec for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
+    logger.info(f"Waiting for all model to be loaded in process {accelerator.state.process_index}/{accelerator.state.num_processes}")
     accelerator.wait_for_everyone()
     logger.info(f"model loaded for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
-
-
     return load_stable_diffusion_format, text_encoder1, text_encoder2, vae, unet, logit_scale, ckpt_info
 
 
