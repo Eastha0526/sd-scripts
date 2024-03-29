@@ -4971,6 +4971,7 @@ def sample_images_common(
                         accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
                     )]
         try:
+            import wandb
             print(image_paths)
             logger = accelerator.get_tracker("wandb")
             logger.log({f"sample_{i}" : wandb.Image(Image.open(image_path)) for i, image_path in enumerate(image_paths)})
