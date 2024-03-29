@@ -196,11 +196,11 @@ def train(args):
     # acceleratorを準備する
     logger.info("prepare accelerator")
     accelerator = train_util.prepare_accelerator(args)
-
+    logger.info("Finished preparing accelerator")
     # mixed precisionに対応した型を用意しておき適宜castする
     weight_dtype, save_dtype = train_util.prepare_dtype(args)
     vae_dtype = torch.float32 if args.no_half_vae else weight_dtype
-
+    logger.info(f"weight_dtype: {weight_dtype}, save_dtype: {save_dtype}, vae_dtype: {vae_dtype}")
     # モデルを読み込む
     (
         load_stable_diffusion_format,
@@ -212,7 +212,7 @@ def train(args):
         ckpt_info,
     ) = sdxl_train_util.load_target_model(args, accelerator, "sdxl", weight_dtype)
     # logit_scale = logit_scale.to(accelerator.device, dtype=weight_dtype)
-
+    logger.info(f"Finished loading target model")
     # verify load/save model formats
     if load_stable_diffusion_format:
         src_stable_diffusion_ckpt = args.pretrained_model_name_or_path
