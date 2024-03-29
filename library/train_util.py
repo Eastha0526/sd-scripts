@@ -5109,7 +5109,7 @@ def sample_images_common(
                 # 0327_bs768_lion_highres_focus_fixxl4_000020_13_20240329061413_42
                 # get 13
                 file_basename = os.path.basename(image_path_saved).split(".")[0]
-                sample_idx = int(file_basename.split("_")[-2])
+                sample_idx = int(file_basename.split("_")[-3])
                 wandb_logger.log({f"sample_{sample_idx}" : wandb.Image(Image.open(image_path_saved))}, step=steps)
         except Exception as e:
             print(e)
