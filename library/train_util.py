@@ -81,6 +81,14 @@ logger = logging.getLogger(__name__)
 # from library.hypernetwork import replace_attentions_for_hypernetwork
 from library.original_unet import UNet2DConditionModel
 
+logger_logged_lines = 0
+def log_every(messages, n):
+    global logger_logged_lines
+    if logger_logged_lines % n == 0:
+        for message in messages:
+            logger.info(message)
+    logger_logged_lines += 1
+
 # Tokenizer: checkpointから読み込むのではなくあらかじめ提供されているものを使う
 TOKENIZER_PATH = "openai/clip-vit-large-patch14"
 V2_STABLE_DIFFUSION_PATH = "stabilityai/stable-diffusion-2"  # ここからtokenizerだけ使う v2とv2.1はtokenizer仕様は同じ
@@ -876,6 +884,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     caption = caption.replace(str_from, str_to)
         if not is_drop_out and subset.caption_tag_dropout_rate == 0 and subset.token_warmup_step == 0:
             assert caption, "caption should not be empty if not dropout, warmup, or tag dropout"
+        log_every(f"caption: {caption}", 3000)
         return caption
 
     def get_input_ids(self, caption, tokenizer=None):
