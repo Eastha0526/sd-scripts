@@ -57,15 +57,16 @@ def load_target_model(args, accelerator:Accelerator, model_version: str, weight_
                 vae.to(accelerator.device)
 
             clean_memory_on_device(accelerator.device)
-            logger.info(f"model loaded in {time.time() - start_time:.2f} sec")
+            logger.info(f"model loaded in {time.time() - start_time:.2f} sec for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
             model_wait_called = True
         else:
             logger.info(f"Skipping {pi} since it is not the local process {accelerator.state.process_index}/{accelerator.state.num_processes}")
-        logger.info(f"Waiting in process {accelerator.state.process_index}/{accelerator.state.num_processes}")
-        accelerator.wait_for_everyone()
-        logger.info(f"model loaded for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
     if not model_wait_called:
         raise ValueError(f"Model loading is not called in process {accelerator.state.process_index}/{accelerator.state.num_processes}")
+    logger.info(f"Waiting in process {accelerator.state.process_index}/{accelerator.state.num_processes}")
+    accelerator.wait_for_everyone()
+    logger.info(f"model loaded for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
+
 
     return load_stable_diffusion_format, text_encoder1, text_encoder2, vae, unet, logit_scale, ckpt_info
 
