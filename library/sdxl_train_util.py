@@ -1,6 +1,7 @@
 import argparse
 import math
 import os
+import time
 from typing import Optional
 
 import torch
@@ -29,7 +30,7 @@ def load_target_model(args, accelerator, model_version: str, weight_dtype):
     for pi in range(accelerator.state.num_processes):
         if pi == accelerator.state.local_process_index:
             logger.info(f"loading model for process {accelerator.state.local_process_index}/{accelerator.state.num_processes}")
-
+            start_time = time.time()
             (
                 load_stable_diffusion_format,
                 text_encoder1,
@@ -55,6 +56,7 @@ def load_target_model(args, accelerator, model_version: str, weight_dtype):
                 vae.to(accelerator.device)
 
             clean_memory_on_device(accelerator.device)
+            logger.info(f"model loaded in {time.time() - start_time:.2f} sec")
         accelerator.wait_for_everyone()
 
     return load_stable_diffusion_format, text_encoder1, text_encoder2, vae, unet, logit_scale, ckpt_info
