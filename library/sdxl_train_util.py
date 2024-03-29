@@ -5,6 +5,7 @@ import time
 from typing import Optional
 
 import torch
+import torch.distributed
 from library.device_utils import init_ipex, clean_memory_on_device
 init_ipex()
 
@@ -25,7 +26,7 @@ TOKENIZER2_PATH = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
 
 
 def load_target_model(args, accelerator:Accelerator, model_version: str, weight_dtype):
-    # load models for each process
+    logger.info(f"loading model for process {pid}/{accelerator.state.num_processes}")
     model_dtype = match_mixed_precision(args, weight_dtype)  # prepare fp16/bf16
     logger.info(f"loading model for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
     start_time = time.time()
@@ -56,7 +57,11 @@ def load_target_model(args, accelerator:Accelerator, model_version: str, weight_
     clean_memory_on_device(accelerator.device)
     logger.info(f"model loaded in {time.time() - start_time:.2f} sec for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
     logger.info(f"Waiting for all model to be loaded in process {accelerator.state.process_index}/{accelerator.state.num_processes}")
-    accelerator.wait_for_everyone()
+    # get world size
+    world_size = torch.distributed.get_world_size()
+    rank = torch.distributed.get_rank()
+    logger.info(f"world_size={world_size}, rank={rank}")
+    torch.distributed.barrier()
     logger.info(f"model loaded for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
     return load_stable_diffusion_format, text_encoder1, text_encoder2, vae, unet, logit_scale, ckpt_info
 
