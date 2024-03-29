@@ -5120,7 +5120,7 @@ def sample_images_common(
                 logger.info(image_paths)
                 wandb_logger = accelerator.get_tracker("wandb")
                 # parse base filename without ext from first image path
-                for image_path_saved in get_all_paths_like_imagepath(image_paths[0]):
+                for image_path_saved in get_all_paths_like_imagepaths_by_time(image_paths[0]):
                     # 0327_bs768_lion_highres_focus_fixxl4_000020_13_20240329061413_42
                     # get 13
                     file_basename = os.path.basename(image_path_saved).split(".")[0]
@@ -5147,16 +5147,23 @@ def sample_images_common(
         torch.cuda.set_rng_state(cuda_rng_state)
     vae.to(org_vae_device)
 
-def get_all_paths_like_imagepath(image_path):
+def get_all_paths_like_imagepaths_by_time(image_path):
     file_basename = os.path.basename(image_path).split(".")[0]
-    sample_idx = int(file_basename.split("_")[-3])
-    front_fixed_part = "_".join(file_basename.split("_")[:-3]) #'' if args.output_name is None else args.output_name + '_'}{num_suffix}_
-    last_fixed_part_except_time_and_index = "_".join(file_basename.split("_")[-1:]) # {seed_suffix}.png
-    regex = re.compile(f"{front_fixed_part}_(\d+)_\d+_{last_fixed_part_except_time_and_index}")
+    timestamp_str = file_basename.split("_")[-2]
+    original_timestamp = datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
+    
+    front_fixed_part = "_".join(file_basename.split("_")[:-3])
+    last_fixed_part = "_".join(file_basename.split("_")[-1:])
+    regex = re.compile(f"{front_fixed_part}_(\d+)_\d+_(\d+)_{last_fixed_part}")
+
     for root, dirs, files in os.walk(os.path.dirname(image_path)):
         for file in files:
-            if regex.match(file):
-                yield os.path.join(root, file)
+            match = regex.match(file)
+            if match:
+                file_timestamp_str = match.group(2)
+                file_timestamp = datetime.strptime(file_timestamp_str, "%Y%m%d%H%M%S")
+                if abs((original_timestamp - file_timestamp).total_seconds()) <= 3:
+                    yield os.path.join(root, file)
 
 def sample_image_inference(
     accelerator: Accelerator,
