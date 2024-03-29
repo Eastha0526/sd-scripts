@@ -196,7 +196,7 @@ def train(args):
     # acceleratorを準備する
     logger.info("prepare accelerator")
     accelerator = train_util.prepare_accelerator(args)
-    logger.info("Finished preparing accelerator")
+    logger.info(f"Finished preparing accelerator {accelerator.local_process_index}")
     # mixed precisionに対応した型を用意しておき適宜castする
     weight_dtype, save_dtype = train_util.prepare_dtype(args)
     vae_dtype = torch.float32 if args.no_half_vae else weight_dtype
