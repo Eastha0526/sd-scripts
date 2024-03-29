@@ -198,7 +198,7 @@ def train(args):
     logger.info("prepare accelerator")
     accelerator = train_util.prepare_accelerator(args)
     logger.info(f"Testing accelerator: {accelerator.local_process_index} in {accelerator.process_index}")
-    torch.distributed.monitored_barrier()
+    torch.distributed.monitored_barrier(timeout=30,wait_all_ranks=True)
     logger.info(f"Finished preparing accelerator {accelerator.local_process_index}")
     # mixed precisionに対応した型を用意しておき適宜castする
     weight_dtype, save_dtype = train_util.prepare_dtype(args)
