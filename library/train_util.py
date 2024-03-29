@@ -5100,24 +5100,26 @@ def sample_images_common(
                     image_paths += [sample_image_inference(
                         accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
                     )]
-        try:
-            import wandb
-            print(image_paths)
-            wandb_logger = accelerator.get_tracker("wandb")
-            # parse base filename without ext from first image path
-            for image_path_saved in image_paths:
-                # 0327_bs768_lion_highres_focus_fixxl4_000020_13_20240329061413_42
-                # get 13
-                file_basename = os.path.basename(image_path_saved).split(".")[0]
-                sample_idx = int(file_basename.split("_")[-3])
-                wandb_logger.log(
-                    {f"sample_{sample_idx}" : wandb.Image(Image.open(image_path_saved))},
-                    commit=False,
-                    step=steps,
-                    )
-        except Exception as e:
-            print(e)
-            pass
+        # if not main process, return
+        if distributed_state.process_index == 0:
+            try:
+                import wandb
+                logger.info(image_paths)
+                wandb_logger = accelerator.get_tracker("wandb")
+                # parse base filename without ext from first image path
+                for image_path_saved in get_all_paths_like_imagepath(image_paths[0]):
+                    # 0327_bs768_lion_highres_focus_fixxl4_000020_13_20240329061413_42
+                    # get 13
+                    file_basename = os.path.basename(image_path_saved).split(".")[0]
+                    sample_idx = int(file_basename.split("_")[-3])
+                    wandb_logger.log(
+                        {f"sample_{sample_idx}" : wandb.Image(Image.open(image_path_saved))},
+                        commit=False,
+                        step=steps,
+                        )
+            except Exception as e:
+                logger.warn(e)
+                pass
 
     # clear pipeline and cache to reduce vram usage
     del pipeline
@@ -5132,6 +5134,16 @@ def sample_images_common(
         torch.cuda.set_rng_state(cuda_rng_state)
     vae.to(org_vae_device)
 
+def get_all_paths_like_imagepath(image_path):
+    file_basename = os.path.basename(image_path).split(".")[0]
+    sample_idx = int(file_basename.split("_")[-3])
+    front_fixed_part = "_".join(file_basename.split("_")[:-3]) #'' if args.output_name is None else args.output_name + '_'}{num_suffix}_
+    last_fixed_part_except_time_and_index = "_".join(file_basename.split("_")[-1:]) # {seed_suffix}.png
+    regex = re.compile(f"{front_fixed_part}_(\d+)_\d+_{last_fixed_part_except_time_and_index}")
+    for root, dirs, files in os.walk(os.path.dirname(image_path)):
+        for file in files:
+            if regex.match(file):
+                yield os.path.join(root, file)
 
 def sample_image_inference(
     accelerator: Accelerator,
