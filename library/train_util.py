@@ -171,7 +171,28 @@ class ImageInfo:
         self.text_encoder_outputs1: Optional[torch.Tensor] = None
         self.text_encoder_outputs2: Optional[torch.Tensor] = None
         self.text_encoder_pool2: Optional[torch.Tensor] = None
+        self.supports_multiple_caption: bool = False
 
+    def get_caption(self, random_instance=None):
+        """
+        Returns caption to be used for training
+        """
+        if self.supports_multiple_caption:
+            if random_instance is None:
+                return random.choice(self.captions)
+            return random_instance.choice(self.captions)
+        else:
+            return self.caption
+
+class MultiCaptionImageInfo(ImageInfo):
+    """
+    Image Info Class that supports multiple captions
+    """
+    def __init__(self, image_key: str, num_repeats: int, captions: List[str], is_reg: bool, absolute_path: str) -> None:
+        assert len(captions) > 0, "captions must be a list of strings"
+        super().__init__(image_key, num_repeats, captions[0], is_reg, absolute_path)
+        self.captions: List[str] = captions
+        self.supports_multiple_caption = True
 
 class BucketManager:
     def __init__(self, no_upscale, max_reso, min_size, max_size, reso_steps) -> None:
@@ -389,6 +410,7 @@ class BaseSubset:
         caption_suffix: Optional[str],
         token_warmup_min: int,
         token_warmup_step: Union[float, int],
+        multi_captions: bool = False,
     ) -> None:
         self.image_dir = image_dir
         self.num_repeats = num_repeats
@@ -435,6 +457,7 @@ class DreamBoothSubset(BaseSubset):
         caption_suffix,
         token_warmup_min,
         token_warmup_step,
+        multi_captions: bool = False,
     ) -> None:
         assert image_dir is not None, "image_dir must be specified / image_dirは指定が必須です"
 
@@ -491,6 +514,7 @@ class FineTuningSubset(BaseSubset):
         caption_suffix,
         token_warmup_min,
         token_warmup_step,
+        multi_captions: bool = False,
     ) -> None:
         assert metadata_file is not None, "metadata_file must be specified / metadata_fileは指定が必須です"
 
@@ -512,6 +536,7 @@ class FineTuningSubset(BaseSubset):
             caption_suffix,
             token_warmup_min,
             token_warmup_step,
+            multi_captions
         )
 
         self.metadata_file = metadata_file
@@ -579,6 +604,7 @@ class ControlNetSubset(BaseSubset):
 
 def shuffle_caption_by_separtor(caption, separator, caption_splitter):
     splitted_parts = caption.split(separator)
+    #random.shuffle(splitted_parts)
     splitted_parts = [c.strip().split(caption_splitter) for c in splitted_parts if c.strip()]
     splitted_parts = [[c.strip() for c in parts if c.strip()] for parts in splitted_parts if parts]
     for parts in splitted_parts:
@@ -683,7 +709,13 @@ class BaseDataset(torch.utils.data.Dataset):
     def add_replacement(self, str_from, str_to):
         self.replacements[str_from] = str_to
 
-    def process_caption(self, subset: BaseSubset, caption):
+    def process_caption(self, subset: BaseSubset, caption, imageinfo: ImageInfo = None, random_instance=None):
+        """
+        Processes caption by adding prefix/suffix and applying dropout in runtime.
+        """
+        if imageinfo and imageinfo.supports_multiple_caption:
+            # マルチキャプション対応
+            caption = imageinfo.get_caption(random_instance)
         # caption に prefix/suffix を付ける
         if subset.caption_prefix:
             caption = subset.caption_prefix + " " + caption
@@ -710,7 +742,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     and subset.keep_tokens_separator in caption
                 ):
                     if subset.shuffle_caption:
-                        fixed_part, flex_part = shuffle_caption_by_separtor(caption, subset.keep_tokens_separator, subset.caption_separator)
+                        fixed_tokens, flex_tokens = shuffle_caption_by_separtor(caption, subset.keep_tokens_separator, subset.caption_separator)
                     else:
                         fixed_part, flex_part = caption.split(subset.keep_tokens_separator, 1)
                         fixed_tokens = [t.strip() for t in fixed_part.split(subset.caption_separator) if t.strip()]
@@ -741,13 +773,91 @@ class BaseDataset(torch.utils.data.Dataset):
                     if subset.caption_tag_dropout_rate <= 0:
                         return tokens
                     l = []
-                    for token in tokens:
-                        if random.random() >= subset.caption_tag_dropout_rate:
-                            l.append(token)
+                    # 20% chance to drop until 50% of the tokens or until token count < 10 and add "very simple caption" instead
+                    # 30% chance to drop until 30% of the tokens and add "simple caption" instead
+                    # dropout_rate chance to drop until 10% of the tokens
+                    # if token count is larger than 50, add "detailed caption"
+                    no_dropout_tokens = [
+                        "low ",
+                        "lineart",
+                        " art",
+                        "from ",
+                        " body",
+                        "multiple",
+                        "artifact",
+                        "lowres",
+                        "koma",
+                        "pov",
+                        "censor",
+                        "upside" # these are critical tags for image comprehension
+                        "guro",
+                        "scat",
+                        "gore",
+                        "cover", # now some scan / copyrighted material
+                        "manga",
+                        "comic",
+                        "letterbox",
+                        "watermark",
+                        "scan",
+                        "doujin",
+                        "anatomical nonsense", #for better body part recognition
+                        "bad hands",
+                        "bad feet",
+                        "bad proportions",
+                        "quality",
+                        "bad aspect",
+                        "extra digits",
+                        "bad reflection",
+                        "artistic",
+                        "poorly drawn",
+                        "chromatic",
+                        "chiaroscuro",
+                        " medium",
+                        "cropped",
+                        "tomboy", # these are some case that model might be confused
+                        "trap",
+                        "tomgirl",
+                        "crossdressing",
+                        "androgynous",
+                        "futa", 
+                        "girl", # gender / persons are important
+                        "boy",
+                        "other",
+                        "explicit",
+                        "ai-generated" # mark the image is generated by AI
+                    ] # The tokens that contains this will not be dropped
+                    len_tokens = len(tokens)
+                    if len_tokens < 10:
+                        l.append("extremely simple caption")
+                        return tokens
+                    if random.random() < 0.45:
+                        target_tokens = max(10, int(len_tokens * 0.3))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        if len(l) <= 50:
+                            l.append("very simple caption")
+                    elif random.random() < 0.25:
+                        target_tokens = max(10, int(len_tokens * 0.4))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        if len(l) <= 50:
+                            l.append("simple caption")
+                    else:
+                        target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                    if len(l) > 10:
+                        l += ["detailed caption"]
                     return l
 
-                if subset.shuffle_caption:
-                    random.shuffle(flex_tokens)
+                #if subset.shuffle_caption:
+                #    random.shuffle(flex_tokens)
 
                 flex_tokens = dropout_tags(flex_tokens)
 
@@ -763,7 +873,8 @@ class BaseDataset(torch.utils.data.Dataset):
                         caption = str_to
                 else:
                     caption = caption.replace(str_from, str_to)
-
+        if not is_drop_out and subset.caption_tag_dropout_rate == 0 and subset.token_warmup_step == 0:
+            assert caption, "caption should not be empty if not dropout, warmup, or tag dropout"
         return caption
 
     def get_input_ids(self, caption, tokenizer=None):
@@ -1251,7 +1362,8 @@ class BaseDataset(torch.utils.data.Dataset):
                 text_encoder_pool2_list.append(text_encoder_pool2)
                 captions.append(caption)
             else:
-                caption = self.process_caption(subset, image_info.caption)
+                # Dynamic runtime-based caption processing
+                caption = self.process_caption(subset, image_info.caption, image_info)
                 if self.XTI_layers:
                     caption_layer = []
                     for layer in self.XTI_layers:
@@ -1405,6 +1517,7 @@ class DreamBoothDataset(BaseDataset):
         bucket_no_upscale: bool,
         prior_loss_weight: float,
         debug_dataset: bool,
+        multi_captions: bool = False,
     ) -> None:
         super().__init__(tokenizer, max_token_length, resolution, network_multiplier, debug_dataset)
 
@@ -1567,6 +1680,9 @@ class DreamBoothDataset(BaseDataset):
 
 
 class FineTuningDataset(BaseDataset):
+    """
+    FineTuningDataset is a dataset for fine-tuning.
+    """
     def __init__(
         self,
         subsets: Sequence[FineTuningSubset],
@@ -1581,6 +1697,7 @@ class FineTuningDataset(BaseDataset):
         bucket_reso_steps: int,
         bucket_no_upscale: bool,
         debug_dataset: bool,
+        multi_captions: bool = False,
     ) -> None:
         super().__init__(tokenizer, max_token_length, resolution, network_multiplier, debug_dataset)
 
@@ -1640,19 +1757,31 @@ class FineTuningDataset(BaseDataset):
                             abs_path = npz_path
 
                 assert abs_path is not None, f"no image / 画像がありません: {image_key}"
-
-                caption = img_md.get("caption")
+                captions = img_md.get("captions", None)
                 tags = img_md.get("tags")
+                if captions is not None: # Multi captions
+                    # captionsがある場合はcaptionを取り出す
+                    assert len(captions) > 0, f"captions is empty / captionsが空です: {image_key}"
+                    assert isinstance(captions, list), f"captions is not list / captionsがリストではありません: {image_key}"
+                    assert all(isinstance(x, str) for x in captions), f"captions is not list of str / captionsが文字列のリストではありません: {image_key}"
+                    caption = captions[0]
+                    if tags is not None and len(tags) > 0:
+                        captions = [c + ", " + tags for c in captions]
+                else: # Single caption
+                    caption = img_md.get("caption")
+                    if caption is None:
+                        caption = tags
+                    elif tags is not None and len(tags) > 0:
+                        caption = caption + ", " + tags
+                        tags_list.append(tags)
+                    captions = [caption]
+                # Now, caption is not None
                 if caption is None:
-                    caption = tags
-                elif tags is not None and len(tags) > 0:
-                    caption = caption + ", " + tags
-                    tags_list.append(tags)
-
-                if caption is None:
-                    caption = ""
-
-                image_info = ImageInfo(image_key, subset.num_repeats, caption, False, abs_path)
+                    raise ValueError(f"no caption and tags / キャプションもタグもありません: {image_key}")
+                if multi_captions:
+                    image_info = MultiCaptionImageInfo(image_key, subset.num_repeats, captions, False, abs_path)
+                else:
+                    image_info = ImageInfo(image_key, subset.num_repeats, caption, False, abs_path)
                 image_info.image_size = img_md.get("train_resolution")
 
                 if not subset.color_aug and not subset.random_crop:
@@ -1792,6 +1921,7 @@ class ControlNetDataset(BaseDataset):
         bucket_reso_steps: int,
         bucket_no_upscale: bool,
         debug_dataset: float,
+        multi_captions: bool = False,
     ) -> None:
         super().__init__(tokenizer, max_token_length, resolution, network_multiplier, debug_dataset)
 
@@ -2023,6 +2153,7 @@ def is_disk_cached_latents_is_expected(reso, npz_path: str, flip_aug: bool):
     expected_latents_size = (reso[1] // 8, reso[0] // 8)  # bucket_resoはWxHなので注意
 
     if not path_exists(npz_path):
+    if not os.path.exists(npz_path):
         return False
 
     npz = np.load(npz_path)
@@ -3153,6 +3284,9 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
         type=str,
         default=None,
         help="file for prompts to generate sample images / 学習中モデルのサンプル出力用プロンプトのファイル",
+    )
+    parser.add_argument(
+        "--multi-captions", type=bool, default=False, help="use multi-captions for training. Specify as 'captions' key, value List[str] / 学習時にマルチキャプションを使用する"
     )
     parser.add_argument(
         "--sample_sampler",
@@ -4699,7 +4833,8 @@ def get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents):
     # Add noise to the latents according to the noise magnitude at each timestep
     # (this is the forward diffusion process)
     if args.ip_noise_gamma:
-        noisy_latents = noise_scheduler.add_noise(latents, noise + args.ip_noise_gamma * torch.randn_like(latents), timesteps)
+        rand_range = random.random() # this prevents denosing attack assuming some uniform gaussian noise
+        noisy_latents = noise_scheduler.add_noise(latents, noise + rand_range * args.ip_noise_gamma * torch.randn_like(latents), timesteps)
     else:
         noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
