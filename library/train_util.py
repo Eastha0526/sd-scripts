@@ -5123,7 +5123,11 @@ def sample_images_common(
                 # get 13
                 file_basename = os.path.basename(image_path_saved).split(".")[0]
                 sample_idx = int(file_basename.split("_")[-3])
-                wandb_logger.log({f"sample_{sample_idx}" : wandb.Image(Image.open(image_path_saved))}, step=steps)
+                wandb_logger.log(
+                    {f"sample_{sample_idx}" : wandb.Image(Image.open(image_path_saved))},
+                    commit=False,
+                    step=steps,
+                    )
         except Exception as e:
             print(e)
             pass
