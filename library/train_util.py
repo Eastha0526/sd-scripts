@@ -2154,7 +2154,6 @@ def is_disk_cached_latents_is_expected(reso, npz_path: str, flip_aug: bool):
     expected_latents_size = (reso[1] // 8, reso[0] // 8)  # bucket_resoはWxHなので注意
 
     if not path_exists(npz_path):
-    if not os.path.exists(npz_path):
         return False
 
     npz = np.load(npz_path)
