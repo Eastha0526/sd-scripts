@@ -5104,8 +5104,8 @@ def sample_images_common(
         try:
             import wandb
             print(image_paths)
-            logger = accelerator.get_tracker("wandb")
-            logger.log({f"sample_{i}" : wandb.Image(Image.open(image_path)) for i, image_path in enumerate(image_paths)})
+            wandb_logger = accelerator.get_tracker("wandb")
+            wandb_logger.log({f"sample_{i}" : wandb.Image(Image.open(image_path)) for i, image_path in enumerate(image_paths)})
         except Exception as e:
             print(e)
             pass
