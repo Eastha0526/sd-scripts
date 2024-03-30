@@ -4229,6 +4229,7 @@ def prepare_accelerator(args: argparse.Namespace):
                 os.environ['WANDB__SERVICE_WAIT'] = '300'
                 wandb.login(key=args.wandb_api_key, timeout=300)
 
+
     # torch.compile のオプション。 NO の場合は torch.compile は使わない
     dynamo_backend = "NO"
     if args.torch_compile:
@@ -5123,7 +5124,6 @@ def sample_images_common(
                 # parse base filename without ext from first image path
                 for image_path_saved in get_all_paths_like_imagepaths_by_time(image_paths[0]):
                     # 0327_bs768_lion_highres_focus_fixxl4_000020_13_20240329061413_42
-                    # get 13
                     file_basename = os.path.basename(image_path_saved).split(".")[0]
                     sample_idx = int(file_basename.split("_")[-3])
                     wandb_logger.log(
