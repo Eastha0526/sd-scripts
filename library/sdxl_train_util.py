@@ -63,7 +63,7 @@ def load_target_model(args, accelerator:Accelerator, model_version: str, weight_
         logger.info(f"world_size={world_size}, rank={rank}")
     except:
         logger.info("torch.distributed.get_world_size() is not available")
-    torch.distributed.barrier()
+    accelerator.wait_for_everyone()
     logger.info(f"model loaded for process {accelerator.state.process_index}/{accelerator.state.num_processes}")
     return load_stable_diffusion_format, text_encoder1, text_encoder2, vae, unet, logit_scale, ckpt_info
 
