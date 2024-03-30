@@ -4226,7 +4226,8 @@ def prepare_accelerator(args: argparse.Namespace):
                 os.makedirs(logging_dir, exist_ok=True)
                 os.environ["WANDB_DIR"] = logging_dir
             if args.wandb_api_key is not None:
-                wandb.login(key=args.wandb_api_key)
+                os.environ['WANDB__SERVICE_WAIT'] = 300
+                wandb.login(key=args.wandb_api_key, timeout=300)
 
     # torch.compile のオプション。 NO の場合は torch.compile は使わない
     dynamo_backend = "NO"
