@@ -5100,6 +5100,7 @@ def sample_images_common(
                     image_paths += [sample_image_inference(
                         accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
                     )]
+        accelerator.wait_for_everyone()
         # if not main process, return
         if distributed_state.process_index == 0:
             try:
