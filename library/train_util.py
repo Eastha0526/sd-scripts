@@ -773,16 +773,16 @@ class BaseDataset(torch.utils.data.Dataset):
                     # dropout_rate chance to drop until 10% of the tokens
                     # if token count is larger than 50, add "detailed caption"
                     no_dropout_tokens = [
-                        "low ",
+                        # "low ",
                         "lineart",
                         " art",
-                        "from ",
-                        " body",
+                        # "from ",
+                        # " body",
                         "multiple",
                         "artifact",
                         "lowres",
                         "koma",
-                        "pov",
+                        # "pov",
                         "censor",
                         "upside" # these are critical tags for image comprehension
                         "guro",
@@ -841,6 +841,14 @@ class BaseDataset(torch.utils.data.Dataset):
                                 l.append(token)
                         if len(l) <= 50:
                             l.append("simple caption")
+                    elif random.random() < 0.1:
+                        # use only max 6 tokens
+                        target_tokens = min(6, len_tokens)
+                        selected_token_indices = random.sample(range(len_tokens), target_tokens)
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        l.append("extremely simple caption")
                     else:
                         target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
