@@ -5082,12 +5082,13 @@ def sample_images_common(
         pass
 
     if distributed_state.num_processes <= 1:
+        image_paths = []
         # If only one device is available, just use the original prompt list. We don't need to care about the distribution of prompts.
         with torch.no_grad():
             for prompt_dict in prompts:
-                sample_image_inference(
+                image_paths += [sample_image_inference(
                     accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
-                )
+                )]
     else:
         # Creating list with N elements, where each element is a list of prompt_dicts, and N is the number of processes available (number of devices available)
         # prompt_dicts are assigned to lists based on order of processes, to attempt to time the image creation time to match enum order. Probably only works when steps and sampler are identical.
@@ -5101,28 +5102,28 @@ def sample_images_common(
                     image_paths += [sample_image_inference(
                         accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
                     )]
-        accelerator.wait_for_everyone()
+    accelerator.wait_for_everyone()
         # if not main process, return
-        if accelerator.is_main_process:
-            try:
-                import wandb
-                logger.info(image_paths)
-                wandb_logger = accelerator.get_tracker("wandb")
-                # parse base filename without ext from first image path
-                for image_path_saved in get_all_paths_like_imagepaths_by_time(image_paths[0]):
-                    # 0327_bs768_lion_highres_focus_fixxl4_000020_13_20240329061413_42
-                    # get 13
-                    file_basename = os.path.basename(image_path_saved).split(".")[0]
-                    sample_idx = int(file_basename.split("_")[-3])
-                    logger.info(f"sample_idx: {sample_idx} -> {image_path_saved}")
-                    wandb_logger.log(
-                        {f"sample_{sample_idx}" : wandb.Image(Image.open(image_path_saved))},
-                        commit=False,
-                        step=steps,
-                        )
-            except Exception as e:
-                logger.warn(e)
-                pass
+    if accelerator.is_main_process:
+        try:
+            import wandb
+            logger.info(image_paths)
+            wandb_logger = accelerator.get_tracker("wandb")
+            # parse base filename without ext from first image path
+            for image_path_saved in get_all_paths_like_imagepaths_by_time(image_paths[0]):
+                # 0327_bs768_lion_highres_focus_fixxl4_000020_13_20240329061413_42
+                # get 13
+                file_basename = os.path.basename(image_path_saved).split(".")[0]
+                sample_idx = int(file_basename.split("_")[-3])
+                logger.info(f"sample_idx: {sample_idx} -> {image_path_saved}")
+                wandb_logger.log(
+                    {f"sample_{sample_idx}" : wandb.Image(Image.open(image_path_saved))},
+                    commit=False,
+                    step=steps,
+                    )
+        except Exception as e:
+            logger.warn(e)
+            pass
 
     # clear pipeline and cache to reduce vram usage
     del pipeline
