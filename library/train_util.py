@@ -5116,7 +5116,7 @@ def sample_images_common(
                     )]
         accelerator.wait_for_everyone()
         # if not main process, return
-        if distributed_state.process_index == 0:
+        if accelerator.is_main_process:
             try:
                 import wandb
                 logger.info(image_paths)
@@ -5127,6 +5127,7 @@ def sample_images_common(
                     # get 13
                     file_basename = os.path.basename(image_path_saved).split(".")[0]
                     sample_idx = int(file_basename.split("_")[-3])
+                    logger.info(f"sample_idx: {sample_idx} -> {image_path_saved}")
                     wandb_logger.log(
                         {f"sample_{sample_idx}" : wandb.Image(Image.open(image_path_saved))},
                         commit=False,
