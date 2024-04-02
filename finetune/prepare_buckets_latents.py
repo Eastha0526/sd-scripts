@@ -2,6 +2,7 @@ import argparse
 import os
 import json
 
+import glob
 from pathlib import Path
 from typing import List
 from tqdm import tqdm
@@ -44,7 +45,9 @@ def collate_fn_remove_corrupted(batch):
 
 def get_npz_filename(data_dir, image_key, is_full_path, recursive):
     if is_full_path:
-        base_name = os.path.splitext(os.path.basename(image_key))[0]
+        ext = os.path.splitext(os.path.basename(image_key))[1]
+        return image_key.replace(ext, ".npz")
+        # why the fuck we need the next lines
         relative_path = os.path.relpath(os.path.dirname(image_key), data_dir)
     else:
         base_name = image_key
@@ -55,6 +58,22 @@ def get_npz_filename(data_dir, image_key, is_full_path, recursive):
     else:
         return os.path.join(data_dir, base_name) + ".npz"
 
+def split_dataset(image_paths, n_split, current_index):
+    """
+    Split dataset into n_split parts and return current_index part.
+    """
+    count = len(image_paths)
+    if count < n_split:
+        print(f"WARNING: dataset is too small for n_split / データセットが小さすぎます: {count} < {n_split}")
+        return image_paths
+    split_size = count // n_split
+    start = split_size * current_index
+    end = start + split_size
+    # last index, return [start:]
+    if current_index == n_split - 1:
+        end = count
+    print(f"split dataset with length {count} into {n_split} parts, current_index: {current_index}, start: {start}, end: {end}")
+    return image_paths[start:end]
 
 def main(args):
     # assert args.bucket_reso_steps % 8 == 0, f"bucket_reso_steps must be divisible by 8 / bucket_reso_stepは8で割り切れる必要があります"
@@ -64,18 +83,22 @@ def main(args):
         logger.warning(
             f"WARNING: bucket_reso_steps is not divisible by 32. It is not working with SDXL / bucket_reso_stepsが32で割り切れません。SDXLでは動作しません"
         )
-
-    train_data_dir_path = Path(args.train_data_dir)
-    image_paths: List[str] = [str(p) for p in train_util.glob_images_pathlib(train_data_dir_path, args.recursive)]
-    logger.info(f"found {len(image_paths)} images.")
-
     if os.path.exists(args.in_json):
         logger.info(f"loading existing metadata: {args.in_json}")
         with open(args.in_json, "rt", encoding="utf-8") as f:
             metadata = json.load(f)
+        print(f"loaded existing metadata: {len(metadata)}")
     else:
-        assert args.json_pattern, "train_data_dir or json_pattern is required / train_data_dirかjson_patternが必要です"
-        train_data_dir_path = None
+        assert args.json_pattern or args.train_data_dir, "train_data_dir or json_pattern is required / train_data_dirかjson_patternが必要です"
+    if not args.json_pattern and not args.train_data_dir:
+        if os.path.exists(args.in_json):
+            print(f"loading existing metadata: {args.in_json}")
+            with open(args.in_json, "rt", encoding="utf-8") as f:
+                metadata = json.load(f)
+        if not metadata:
+            print(f"no metadata / メタデータファイルがありません: {args.in_json}")
+            return
+        image_paths = list(metadata.keys())
     if args.json_pattern:
         json_list = glob.glob(args.json_pattern)
         if len(json_list) == 0:
@@ -95,8 +118,12 @@ def main(args):
                     {
                         key : {"tag": value} for key, value in partial_metadata.items()
                     }
-                )       
-    else:         
+                )
+        print(f"loaded metadata: {len(metadata)}")   
+    elif args.train_data_dir:
+        train_data_dir_path = Path(args.train_data_dir)
+        image_paths: List[str] = [str(p) for p in train_util.glob_images_pathlib(train_data_dir_path, args.recursive)]
+        logger.info(f"found {len(image_paths)} images.")
         image_paths: List[str] = [str(p) for p in train_util.glob_images_pathlib(train_data_dir_path, args.recursive)]
     if args.skip_existing:
         print("skip_existing is enabled, so it will skip images if npz already exists / skip_existingが有効なので、npzが既に存在する画像はスキップします")
@@ -126,14 +153,7 @@ def main(args):
                 key: metadata[key] for key in image_paths
             }
     print(f"found {len(image_paths)} images, metadata: {len(metadata)}")
-    if not args.json_pattern and not args.train_data_dir:
-        if os.path.exists(args.in_json):
-            print(f"loading existing metadata: {args.in_json}")
-            with open(args.in_json, "rt", encoding="utf-8") as f:
-                metadata = json.load(f)
-        elif not metadata:
-            print(f"no metadata / メタデータファイルがありません: {args.in_json}")
-            return
+
 
     weight_dtype = torch.float32
     if args.mixed_precision == "fp16":
