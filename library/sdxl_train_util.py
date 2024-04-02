@@ -59,9 +59,9 @@ def load_target_model(args, accelerator:Accelerator, model_version: str, weight_
             logger.info(f"model loaded in {time.time() - start_time:.2f} sec")
         else:
             logger.info(f"Skipping {pi} since it is not the local process {accelerator.state.local_process_index}/{accelerator.state.num_processes}")
-        logger.info(f"Waiting in process {accelerator.state.local_process_index}/{accelerator.state.num_processes}")
-        accelerator.wait_for_everyone()
-        logger.info(f"model loaded for process {accelerator.state.local_process_index}/{accelerator.state.num_processes}")
+    logger.info(f"Waiting in process {accelerator.state.local_process_index}/{accelerator.state.num_processes}")
+    accelerator.wait_for_everyone()
+    logger.info(f"model loaded for process {accelerator.state.local_process_index}/{accelerator.state.num_processes}")
 
     return load_stable_diffusion_format, text_encoder1, text_encoder2, vae, unet, logit_scale, ckpt_info
 
