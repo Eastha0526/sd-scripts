@@ -83,13 +83,14 @@ def main(args):
         logger.warning(
             f"WARNING: bucket_reso_steps is not divisible by 32. It is not working with SDXL / bucket_reso_stepsが32で割り切れません。SDXLでは動作しません"
         )
-    if os.path.exists(args.in_json):
+    if args.in_json and os.path.exists(args.in_json):
         logger.info(f"loading existing metadata: {args.in_json}")
         with open(args.in_json, "rt", encoding="utf-8") as f:
             metadata = json.load(f)
         print(f"loaded existing metadata: {len(metadata)}")
     else:
         assert args.json_pattern or args.train_data_dir, "train_data_dir or json_pattern is required / train_data_dirかjson_patternが必要です"
+        metadata = {}
     if not args.json_pattern and not args.train_data_dir:
         if os.path.exists(args.in_json):
             print(f"loading existing metadata: {args.in_json}")
@@ -124,7 +125,7 @@ def main(args):
         train_data_dir_path = Path(args.train_data_dir)
         image_paths: List[str] = [str(p) for p in train_util.glob_images_pathlib(train_data_dir_path, args.recursive)]
         logger.info(f"found {len(image_paths)} images.")
-        image_paths: List[str] = [str(p) for p in train_util.glob_images_pathlib(train_data_dir_path, args.recursive)]
+        metadata = {p: {} for p in image_paths}
     if args.skip_existing:
         print("skip_existing is enabled, so it will skip images if npz already exists / skip_existingが有効なので、npzが既に存在する画像はスキップします")
         # check if npz exists'

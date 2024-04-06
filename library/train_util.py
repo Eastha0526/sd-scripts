@@ -825,7 +825,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     if len_tokens < 10:
                         l.append("extremely simple caption")
                         return tokens
-                    if random.random() < 0.45:
+                    if random.random() < 0.05:
                         target_tokens = max(10, int(len_tokens * 0.3))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
@@ -833,7 +833,7 @@ class BaseDataset(torch.utils.data.Dataset):
                                 l.append(token)
                         if len(l) <= 50:
                             l.append("very simple caption")
-                    elif random.random() < 0.25:
+                    elif random.random() < 0.05:
                         target_tokens = max(10, int(len_tokens * 0.4))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
@@ -841,7 +841,7 @@ class BaseDataset(torch.utils.data.Dataset):
                                 l.append(token)
                         if len(l) <= 50:
                             l.append("simple caption")
-                    elif random.random() < 0.1:
+                    elif random.random() < 0.05:
                         # use only max 6 tokens
                         target_tokens = min(6, len_tokens)
                         selected_token_indices = random.sample(range(len_tokens), target_tokens)
