@@ -4443,6 +4443,7 @@ def prepare_accelerator(args: argparse.Namespace):
                     "logging_dir is required when log_with is tensorboard / Tensorboardを使う場合、logging_dirを指定してください"
                 )
         if log_with in ["wandb", "all"]:
+            os.environ['WANDB__SERVICE_WAIT'] = '300'
             try:
                 import wandb
             except ImportError:
@@ -4451,7 +4452,6 @@ def prepare_accelerator(args: argparse.Namespace):
                 os.makedirs(logging_dir, exist_ok=True)
                 os.environ["WANDB_DIR"] = logging_dir
             if args.wandb_api_key is not None:
-                os.environ['WANDB__SERVICE_WAIT'] = '300'
                 wandb.login(key=args.wandb_api_key, timeout=300)
 
     # torch.compile のオプション。 NO の場合は torch.compile は使わない
