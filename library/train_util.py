@@ -77,6 +77,13 @@ setup_logging()
 import logging
 
 logger = logging.getLogger(__name__)
+logger_logged_lines = 0
+def log_every(messages, n):
+    global logger_logged_lines
+    if logger_logged_lines % n == 0:
+       logger.info(messages)
+    logger_logged_lines += 1
+
 # from library.attention_processors import FlashAttnProcessor
 # from library.hypernetwork import replace_attentions_for_hypernetwork
 from library.original_unet import UNet2DConditionModel
@@ -367,7 +374,19 @@ class AugHelper:
 
     def get_augmentor(self, use_color_aug: bool):  # -> Optional[Callable[[np.ndarray], Dict[str, np.ndarray]]]:
         return self.color_aug if use_color_aug else None
-
+def shuffle_caption_by_separtor(caption, separator, caption_splitter):
+    splitted_parts = caption.split(separator)
+    #random.shuffle(splitted_parts)
+    splitted_parts = [c.strip().split(caption_splitter) for c in splitted_parts if c.strip()]
+    splitted_parts = [[c.strip() for c in parts if c.strip()] for parts in splitted_parts if parts]
+    for parts in splitted_parts:
+        random.shuffle(parts)
+    # returns first and others
+    if len(splitted_parts) == 1:
+        return splitted_parts[0], []
+    # flatten
+    flex_part = [c for parts in splitted_parts[1:] for c in parts]
+    return splitted_parts[0], flex_part
 
 class BaseSubset:
     def __init__(
@@ -746,13 +765,12 @@ class BaseDataset(torch.utils.data.Dataset):
                     and subset.keep_tokens_separator
                     and subset.keep_tokens_separator in caption
                 ):
-                    fixed_part, flex_part = caption.split(subset.keep_tokens_separator, 1)
-                    if subset.keep_tokens_separator in flex_part:
-                        flex_part, fixed_suffix_part = flex_part.split(subset.keep_tokens_separator, 1)
-                        fixed_suffix_tokens = [t.strip() for t in fixed_suffix_part.split(subset.caption_separator) if t.strip()]
-
-                    fixed_tokens = [t.strip() for t in fixed_part.split(subset.caption_separator) if t.strip()]
-                    flex_tokens = [t.strip() for t in flex_part.split(subset.caption_separator) if t.strip()]
+                    if subset.shuffle_caption:
+                        fixed_tokens, flex_tokens = shuffle_caption_by_separtor(caption, subset.keep_tokens_separator, subset.caption_separator)
+                    else:
+                        fixed_part, flex_part = caption.split(subset.keep_tokens_separator, 1)
+                        fixed_tokens = [t.strip() for t in fixed_part.split(subset.caption_separator) if t.strip()]
+                        flex_tokens = [t.strip() for t in flex_part.split(subset.caption_separator) if t.strip()]
                 else:
                     tokens = [t.strip() for t in caption.strip().split(subset.caption_separator)]
                     flex_tokens = tokens[:]
@@ -772,12 +790,102 @@ class BaseDataset(torch.utils.data.Dataset):
                     flex_tokens = flex_tokens[:tokens_len]
 
                 def dropout_tags(tokens):
+                    # drop until token length gets smaller than 225 (hardcoded here)
+                    if len(tokens) > 225:
+                        while len(tokens) > 225:
+                            tokens.pop(random.randint(0, len(tokens) - 1))
                     if subset.caption_tag_dropout_rate <= 0:
                         return tokens
                     l = []
-                    for token in tokens:
-                        if random.random() >= subset.caption_tag_dropout_rate:
-                            l.append(token)
+                    # 20% chance to drop until 50% of the tokens or until token count < 10 and add "very simple caption" instead
+                    # 30% chance to drop until 30% of the tokens and add "simple caption" instead
+                    # dropout_rate chance to drop until 10% of the tokens
+                    # if token count is larger than 50, add "detailed caption"
+                    no_dropout_tokens = [
+                        # "low ",
+                        "lineart",
+                        " art",
+                        # "from ",
+                        # " body",
+                        "multiple",
+                        "artifact",
+                        "lowres",
+                        "koma",
+                        # "pov",
+                        "censor",
+                        "upside" # these are critical tags for image comprehension
+                        "guro",
+                        "scat",
+                        "gore",
+                        "cover", # now some scan / copyrighted material
+                        "manga",
+                        "comic",
+                        "letterbox",
+                        "watermark",
+                        "scan",
+                        "doujin",
+                        "anatomical nonsense", #for better body part recognition
+                        "bad hands",
+                        "bad feet",
+                        "bad proportions",
+                        "quality",
+                        "bad aspect",
+                        "extra digits",
+                        "bad reflection",
+                        "artistic",
+                        "poorly drawn",
+                        "chromatic",
+                        "chiaroscuro",
+                        " medium",
+                        "cropped",
+                        "tomboy", # these are some case that model might be confused
+                        "trap",
+                        "tomgirl",
+                        "crossdressing",
+                        "androgynous",
+                        "futa", 
+                        "girl", # gender / persons are important
+                        "boy",
+                        "other",
+                        "explicit",
+                        "ai-generated" # mark the image is generated by AI
+                    ] # The tokens that contains this will not be dropped
+                    len_tokens = len(tokens)
+                    if len_tokens < 10:
+                        l.append("extremely simple caption")
+                        return tokens
+                    if random.random() < 0.05:
+                        target_tokens = max(10, int(len_tokens * 0.3))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        if len(l) <= 50:
+                            l.append("very simple caption")
+                    elif random.random() < 0.05:
+                        target_tokens = max(10, int(len_tokens * 0.4))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        if len(l) <= 50:
+                            l.append("simple caption")
+                    elif random.random() < 0.05:
+                        # use only max 6 tokens
+                        target_tokens = min(6, len_tokens)
+                        selected_token_indices = random.sample(range(len_tokens), target_tokens)
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        l.append("extremely simple caption")
+                    else:
+                        target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                    if len(l) > 10:
+                        l += ["detailed caption"]
                     return l
 
                 if subset.shuffle_caption:
@@ -801,7 +909,9 @@ class BaseDataset(torch.utils.data.Dataset):
                         caption = str_to
                 else:
                     caption = caption.replace(str_from, str_to)
-
+        if not is_drop_out and subset.caption_tag_dropout_rate == 0 and subset.token_warmup_step == 0:
+            assert caption, "caption should not be empty if not dropout, warmup, or tag dropout"
+        log_every(f"caption: {caption}", 3000)
         return caption
 
     def get_input_ids(self, caption, tokenizer=None):
