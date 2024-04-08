@@ -156,6 +156,7 @@ def train(args):
                 user_config = {
                     "datasets": [
                         {
+                            "multi_captions" : args.multi_captions,
                             "subsets": [
                                 {
                                     "image_dir": args.train_data_dir,
@@ -365,7 +366,7 @@ def train(args):
         batch_size=1,
         shuffle=True,
         collate_fn=collator,
-        num_workers=n_workers,
+        num_workers=n_workers, # To avoid RuntimeError: DataLoader worker exited unexpectedly with exit code 1.
         persistent_workers=args.persistent_data_loader_workers,
     )
 

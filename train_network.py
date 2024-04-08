@@ -169,7 +169,7 @@ class NetworkTrainer:
                     )
             else:
                 if use_dreambooth_method:
-                    logger.info("Using DreamBooth method.")
+                    print("Using DreamBooth method.", args.train_data_dir, args.reg_data_dir)
                     user_config = {
                         "datasets": [
                             {
@@ -179,6 +179,7 @@ class NetworkTrainer:
                             }
                         ]
                     }
+                    print("DreamBooth config:", user_config)
                 else:
                     logger.info("Training with captions.")
                     user_config = {
@@ -356,18 +357,26 @@ class NetworkTrainer:
             batch_size=1,
             shuffle=True,
             collate_fn=collator,
-            num_workers=n_workers,
+            num_workers=n_workers if not args.deepspeed else 1, # To avoid RuntimeError: DataLoader worker exited unexpectedly with exit code 1.
             persistent_workers=args.persistent_data_loader_workers,
         )
 
         # 学習ステップ数を計算する
         if args.max_train_epochs is not None:
-            args.max_train_steps = args.max_train_epochs * math.ceil(
-                len(train_dataloader) / accelerator.num_processes / args.gradient_accumulation_steps
-            )
-            accelerator.print(
-                f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
-            )
+            if args.deepspeed:
+                args.max_train_steps = args.max_train_epochs * math.ceil(
+                    len(train_dataloader) / args.gradient_accumulation_steps
+                )
+                accelerator.print(
+                    f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
+                )
+            else:
+                args.max_train_steps = args.max_train_epochs * math.ceil(
+                    len(train_dataloader) / accelerator.num_processes / args.gradient_accumulation_steps
+                )
+                accelerator.print(
+                    f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
+                )
 
         # データセット側にも学習ステップを送信
         train_dataset_group.set_max_train_steps(args.max_train_steps)

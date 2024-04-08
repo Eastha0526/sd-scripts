@@ -78,8 +78,7 @@ class BaseSubsetParams:
     caption_tag_dropout_rate: float = 0.0
     token_warmup_min: int = 1
     token_warmup_step: float = 0
-
-
+    multi_captions: bool = False
 @dataclass
 class DreamBoothSubsetParams(BaseSubsetParams):
     is_reg: bool = False
@@ -91,7 +90,6 @@ class DreamBoothSubsetParams(BaseSubsetParams):
 @dataclass
 class FineTuningSubsetParams(BaseSubsetParams):
     metadata_file: Optional[str] = None
-
 
 @dataclass
 class ControlNetSubsetParams(BaseSubsetParams):
@@ -107,7 +105,7 @@ class BaseDatasetParams:
     resolution: Optional[Tuple[int, int]] = None
     network_multiplier: float = 1.0
     debug_dataset: bool = False
-
+    multi_captions: bool = False
 
 @dataclass
 class DreamBoothDatasetParams(BaseDatasetParams):
@@ -128,6 +126,7 @@ class FineTuningDatasetParams(BaseDatasetParams):
     max_bucket_reso: int = 1024
     bucket_reso_steps: int = 64
     bucket_no_upscale: bool = False
+    multi_captions: bool = False
 
 
 @dataclass
@@ -151,12 +150,12 @@ class DatasetBlueprint:
     is_controlnet: bool
     params: Union[DreamBoothDatasetParams, FineTuningDatasetParams]
     subsets: Sequence[SubsetBlueprint]
+    multi_captions: bool = False
 
 
 @dataclass
 class DatasetGroupBlueprint:
     datasets: Sequence[DatasetBlueprint]
-
 
 @dataclass
 class Blueprint:
@@ -237,6 +236,7 @@ class ConfigSanitizer:
         "min_bucket_reso": int,
         "resolution": functools.partial(__validate_and_convert_scalar_or_twodim.__func__, int),
         "network_multiplier": float,
+        "multi_captions": bool,
     }
 
     # options handled by argparse but not handled by user config
