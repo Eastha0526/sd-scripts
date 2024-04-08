@@ -34,6 +34,7 @@ from tqdm import tqdm
 
 import torch
 from library.device_utils import init_ipex, clean_memory_on_device
+from library.webui_utils import wrap_sample_images_external_webui, check_webui_state
 
 init_ipex()
 
@@ -2850,6 +2851,14 @@ def add_sd_models_arguments(parser: argparse.ArgumentParser):
         help="directory for caching Tokenizer (for offline training) / Tokenizerをキャッシュするディレクトリ（ネット接続なしでの学習のため）",
     )
 
+def add_webui_args(parser: argparse.ArgumentParser):
+    # use_external_webui:bool, webui_url:str, webui_auth:str
+    parser.add_argument("--use_external_webui", type=bool, default=False, help="use external webui / 外部webuiを使用する")
+    parser.add_argument("--webui_url", type=str, default=None, help="webui url / webuiのURL")
+    parser.add_argument("--webui_auth", type=str, default=None, help="webui auth / webuiの認証情報, user:password")
+    # should_wait_webui_process
+    parser.add_argument("--should_wait_webui_process", type=bool, default=False, help="wait webui process / webuiプロセスの終了を待つ")
+
 
 def add_optimizer_arguments(parser: argparse.ArgumentParser):
     parser.add_argument(
@@ -5132,7 +5141,36 @@ def sample_images_common(
     if not os.path.isfile(args.sample_prompts):
         logger.error(f"No prompt file / プロンプトファイルがありません: {args.sample_prompts}")
         return
-
+    # check if generate by external webui is enabled #use_external_webui:bool, webui_url:str, webui_auth:str
+    if args.use_external_webui:
+        
+        if args.webui_url is None or "http" not in args.webui_url:
+            print("webui_url is not set or invalid, generating images locally.")
+        else:
+            check_webui_state() # throws exception if webui had an error
+            ckpt_saved_file = os.path.join(args.output_dir, get_epoch_ckpt_name(args, ".safetensors", epoch))
+            if not os.path.isfile(ckpt_saved_file):
+                # try last epoch
+                ckpt_saved_file = os.path.join(args.output_dir, get_last_ckpt_name(args, ".safetensors"))
+                if not os.path.isfile(ckpt_saved_file):
+                    print("No checkpoint file found, generating images locally.")
+                    ckpt_saved_file = None
+                    return
+            request_success, message = wrap_sample_images_external_webui(args.sample_prompts,
+                                        args.output_dir + "/sample",
+                                        args.output_name,
+                                        accelerator,
+                                        args.webui_url,
+                                        args.webui_auth,
+                                        abs_ckpt_path=ckpt_saved_file,
+                                        steps=steps,
+                                        should_sync=args.should_wait_webui_process) # sends file
+        if message:
+            print(message)
+        if request_success:
+            return
+        else:
+            print("Failed to send request to external webui, generating images locally.")
     distributed_state = PartialState()  # for multi gpu distributed inference. this is a singleton, so it's safe to use it here
 
     org_vae_device = vae.device  # CPUにいるはず

@@ -22,6 +22,10 @@ from library import deepspeed_utils, model_util
 
 import library.train_util as train_util
 from library.train_util import DreamBoothDataset
+from library.webui_utils import (
+    wait_until_finished,
+    check_ping_webui
+)
 import library.config_util as config_util
 from library.config_util import (
     ConfigSanitizer,
@@ -44,7 +48,10 @@ setup_logging()
 import logging
 
 logger = logging.getLogger(__name__)
-
+try:
+    from setproctitle import setproctitle
+except (ImportError, ModuleNotFoundError):
+    setproctitle = lambda x: None # does nothing
 
 class NetworkTrainer:
     def __init__(self):
@@ -141,7 +148,14 @@ class NetworkTrainer:
         train_util.prepare_dataset_args(args, True)
         deepspeed_utils.prepare_deepspeed_args(args)
         setup_logging(args, reset=True)
-
+        if args.webui_url and args.use_external_webui:
+            check_ping_webui(args.webui_url, args.webui_auth)
+        if args.process_title is not None:
+            # attach python/ if not specified
+            if not args.process_title.startswith("python/"):
+                setproctitle("python/" + args.process_title)
+            else:
+                setproctitle(args.process_title) # set process title if available, if import has failed, do nothing
         cache_latents = args.cache_latents
         use_dreambooth_method = args.in_json is None
         use_user_config = args.dataset_config is not None
@@ -986,7 +1000,7 @@ class NetworkTrainer:
 
         if is_main_process:
             network = accelerator.unwrap_model(network)
-
+        wait_until_finished(accelerator=accelerator)
         accelerator.end_training()
 
         if is_main_process and (args.save_state or args.save_state_on_train_end):
@@ -1011,7 +1025,13 @@ def setup_parser() -> argparse.ArgumentParser:
     train_util.add_optimizer_arguments(parser)
     config_util.add_config_arguments(parser)
     custom_train_functions.add_custom_train_arguments(parser)
-
+    # setproctitle if available
+    parser.add_argument(
+        "--process_title",
+        type=str,
+        default=None,
+        help="set process title if available / もし可能ならプロセス名を設定する",
+    )
     parser.add_argument(
         "--no_metadata", action="store_true", help="do not save metadata in output model / メタデータを出力先モデルに保存しない"
     )
