@@ -5247,7 +5247,6 @@ def sample_image_inference(
     image.save(os.path.join(save_dir, img_filename))
     return os.path.join(save_dir, img_filename)
 
-
 # endregion
 
 
