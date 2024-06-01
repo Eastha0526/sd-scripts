@@ -773,6 +773,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     )
                     flex_tokens = flex_tokens[:tokens_len]
 
+
                 def dropout_tags(tokens):
                     # drop until token length gets smaller than 225 (hardcoded here)
                     if len(tokens) > 225:
@@ -786,16 +787,16 @@ class BaseDataset(torch.utils.data.Dataset):
                     # dropout_rate chance to drop until 10% of the tokens
                     # if token count is larger than 50, add "detailed caption"
                     no_dropout_tokens = [
-                        "low ",
+                        # "low ",
                         "lineart",
                         " art",
-                        "from ",
-                        " body",
+                        # "from ",
+                        # " body",
                         "multiple",
                         "artifact",
                         "lowres",
                         "koma",
-                        "pov",
+                        # "pov",
                         "censor",
                         "upside" # these are critical tags for image comprehension
                         "guro",
@@ -836,24 +837,36 @@ class BaseDataset(torch.utils.data.Dataset):
                     ] # The tokens that contains this will not be dropped
                     len_tokens = len(tokens)
                     if len_tokens < 10:
-                        l.append("extremely simple caption")
+                        if random.random(0.5) < 0.5:
+                            l.append("extremely simple caption")
                         return tokens
-                    if random.random() < 0.45:
-                        target_tokens = max(10, int(len_tokens * 0.3))
+                    if random.random() < 0.35:
+                        target_tokens = min(10, int(len_tokens * 0.3))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
                         if len(l) <= 50:
-                            l.append("very simple caption")
-                    elif random.random() < 0.25:
-                        target_tokens = max(10, int(len_tokens * 0.4))
+                            if random.random(0.5) < 0.5:
+                                l.append("very simple caption")
+                    elif random.random() < 0.35:
+                        target_tokens = min(15, int(len_tokens * 0.4))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
                         if len(l) <= 50:
-                            l.append("simple caption")
+                            if random.random(0.5) < 0.5:
+                                l.append("simple caption")
+                    elif random.random() < 0.15:
+                        # use only max 6 tokens
+                        target_tokens = min(6, len_tokens)
+                        selected_token_indices = random.sample(range(len_tokens), target_tokens)
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        if random.random(0.5) < 0.5:
+                            l.append("extremely simple caption")
                     else:
                         target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
@@ -861,7 +874,8 @@ class BaseDataset(torch.utils.data.Dataset):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
                     if len(l) > 10:
-                        l += ["detailed caption"]
+                        if random.random(0.5) < 0.5:
+                            l += ["detailed caption"]
                     return l
 
                 #if subset.shuffle_caption:
