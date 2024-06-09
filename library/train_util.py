@@ -129,7 +129,7 @@ CONVERTABLE_DICT = {
     "doctor (arknights)" : ["doctor (arknights)", "arknights doctor", "arknights protagonist"],
     "female doctor (arknights)" : ["female doctor (arknights)", "arknights female doctor"],
     "highres" : ["high resolution", "highres", "high res", "high image quality"],
-    "solo" : ["solo", "alone", "single person", "single character"],
+    "solo" : ["solo", "alone", "single person", "single character", "single view"],
     "solo focus" : ["focus on single character", "solo focus", "single character focus"],
     "long hair" : ["long hair", "long haired", "long haired character"],
     "looking at viewer" : ["looking at camera", "looking at viewer"],
@@ -144,7 +144,18 @@ CONVERTABLE_DICT = {
     "nude" : ["nude", "naked", "nude character"],
     "alternate costume" : ["alternate costume", "alternate outfit", "alternate attire"],
     "day" : ["day", "daytime", "daylight"],
+    "shadow" : ["shadow", "shadows", "shadowed", "shading"],
     "artist name" : ["artist name", "artist signature"],
+    "signature" : ["signature", "artist signature"],
+    "multiple views" : ["multiple views", "various views", "multiple shots", "various shots", "different views", "diverse variations"],
+    "from above" : ["from above", "aerial view", "top view", "high angle"],
+    "from below" : ["from below", "low angle", "from beneath", "from under"],
+    "from behind" : ["from behind", "rear view", "from the back", "back view"],
+    "from side" : ["from side", "side view", "lateral view", "profile view"],
+    "straight-on" : ["straight-on", "front view", "frontal view", "direct view"],
+    "looking back" : ["looking back", "looking behind", "looking over shoulder"],
+    "dutch angle" : ["dutch angle", "tilted angle", "slanted angle", "german angle", "oblique angle"],
+    "sideways" : ["sideways", "rotated image"],
 }
 
 def convert_tags_if_needed(tags):
@@ -927,7 +938,7 @@ class BaseDataset(torch.utils.data.Dataset):
                             l.append("extremely simple caption")
                         return tokens
                     if random.random() < 0.10:
-                        target_tokens = min(10, int(len_tokens * 0.3))
+                        target_tokens = max(10, int(len_tokens * 0.3))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
@@ -936,7 +947,7 @@ class BaseDataset(torch.utils.data.Dataset):
                             if random.random() < 0.5:
                                 l.append("very simple caption")
                     elif random.random() < 0.10:
-                        target_tokens = min(15, int(len_tokens * 0.4))
+                        target_tokens = max(15, int(len_tokens * 0.4))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
@@ -954,7 +965,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         if random.random() < 0.5:
                             l.append("extremely simple caption")
                     else:
-                        target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
+                        target_tokens = max(1, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
