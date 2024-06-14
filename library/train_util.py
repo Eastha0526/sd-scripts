@@ -162,7 +162,7 @@ def convert_tags_if_needed(tags):
     converted = []
     for t in tags:
         if t in CONVERTABLE_DICT:
-            converted.extend(random.choice(CONVERTABLE_DICT[t]))
+            converted.append(random.choice(CONVERTABLE_DICT[t]))
         else:
             converted.append(t)
     return converted
@@ -1192,7 +1192,7 @@ class BaseDataset(torch.utils.data.Dataset):
         batches = []
         batch = []
         logger.info("checking cache validity...")
-        for info in tqdm(image_infos):
+        for image_idx, info in tqdm(enumerate(image_infos)):
             subset = self.image_to_subset[info.image_key]
 
             if info.latents_npz is not None:  # fine tuning dataset
@@ -1201,9 +1201,10 @@ class BaseDataset(torch.utils.data.Dataset):
             # check disk cache exists and size of latents
             if cache_to_disk:
                 info.latents_npz = os.path.splitext(info.absolute_path)[0] + ".npz"
-                if not is_main_process:  # store to info only
+                current_device_index = accelerator.state.local_process_index
+                total_device_index = accelerator.state.num_processes
+                if image_idx % total_device_index != current_device_index:
                     continue
-
                 cache_available = is_disk_cached_latents_is_expected(info.bucket_reso, info.latents_npz, subset.flip_aug)
 
                 if cache_available:  # do not add to batch
@@ -2071,10 +2072,10 @@ class FineTuningDataset(BaseDataset):
         base_name = os.path.splitext(image_key)[0]
         npz_file_norm = base_name + ".npz"
 
-        if os.path.exists(npz_file_norm):
+        if os_path_exists(npz_file_norm):
             # image_key is full path
             npz_file_flip = base_name + "_flip.npz"
-            if not os.path.exists(npz_file_flip):
+            if not os_path_exists(npz_file_flip):
                 npz_file_flip = None
             return npz_file_norm, npz_file_flip
 
@@ -2086,10 +2087,10 @@ class FineTuningDataset(BaseDataset):
         npz_file_norm = os.path.join(subset.image_dir, image_key + ".npz")
         npz_file_flip = os.path.join(subset.image_dir, image_key + "_flip.npz")
 
-        if not os.path.exists(npz_file_norm):
+        if not os_path_exists(npz_file_norm):
             npz_file_norm = None
             npz_file_flip = None
-        elif not os.path.exists(npz_file_flip):
+        elif not os_path_exists(npz_file_flip):
             npz_file_flip = None
 
         return npz_file_norm, npz_file_flip
