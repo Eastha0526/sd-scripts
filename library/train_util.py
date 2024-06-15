@@ -36,8 +36,7 @@ import torch
 from library.device_utils import init_ipex, clean_memory_on_device
 
 init_ipex()
-# DeepSpeedPlugin
-from accelerate import DeepSpeedPlugin
+
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import Optimizer
 from torchvision import transforms
@@ -77,23 +76,32 @@ from library.utils import setup_logging
 setup_logging()
 import logging
 
-SKIP_PATH_CHECK = True
-def os_path_exists(path):
-    if SKIP_PATH_CHECK:
-        return True
-    return os.path.exists(path)
-
 logger = logging.getLogger(__name__)
-# from library.attention_processors import FlashAttnProcessor
-# from library.hypernetwork import replace_attentions_for_hypernetwork
-from library.original_unet import UNet2DConditionModel
-
 logger_logged_lines = 0
 def log_every(messages, n):
     global logger_logged_lines
     if logger_logged_lines % n == 0:
-       logger.info(messages)
+    #    logger.info(messages)
+        pass
     logger_logged_lines += 1
+
+with open('/share0/DEEPTEXT_LAB/captions/tag_mapping.json', 'r', encoding='utf-8') as f:
+    TAG_TRANSLATION_MAPPING = json.load(f)
+
+def translate_by_chance(tag, chance):
+    if random.random() < chance:
+        return TAG_TRANSLATION_MAPPING.get(tag, tag)
+    return tag
+
+def translate_tags(tags, chance):
+    result = []
+    for tag in tags:
+        result.append(translate_by_chance(tag, chance))
+    return result
+
+# from library.attention_processors import FlashAttnProcessor
+# from library.hypernetwork import replace_attentions_for_hypernetwork
+from library.original_unet import UNet2DConditionModel
 
 # Tokenizer: checkpointから読み込むのではなくあらかじめ提供されているものを使う
 TOKENIZER_PATH = "openai/clip-vit-large-patch14"
@@ -113,68 +121,6 @@ DEFAULT_STEP_NAME = "at"
 STEP_STATE_NAME = "{}-step{:08d}-state"
 STEP_FILE_NAME = "{}-step{:08d}"
 STEP_DIFFUSERS_DIR_NAME = "{}-step{:08d}"
-# synonyms
-CONVERTABLE_DICT = {
-    "masterpiece" : ["amazing quality", "masterpiece", "masterpiece quality", "top quality", "most preferred", "professional"],
-    "best quality" : ["best quality", "good", "high quality", "preferred", "best drawing", "best"],
-    "bad quality" : ["bad quality", "low quality", "poor quality", "bad drawing", "badly drawn"],
-    "worst quality" : ["displeasing", "worst drawing", "amateur", "worst quality"],
-    "1girl" : ["one girl", "female", "girl", "female", "1girl"],
-    "1boy" : ["one boy", "one male", "boy", "male", "1boy"],
-    "lineart" : ["line drawing", "lineart", "line art"],
-    "no lineart" : ["no lineart", "vector art", "without lines"],
-    "lowres" : ["low resolution", "lowres", "low res", "low image quality"],
-    "pov" : ["point of view", "pov", "first person view", "first person perspective"],
-    "censor" : ["censored", "censor", "censorship"],
-    "doctor (arknights)" : ["doctor (arknights)", "arknights doctor", "arknights protagonist"],
-    "female doctor (arknights)" : ["female doctor (arknights)", "arknights female doctor"],
-    "highres" : ["high resolution", "highres", "high res", "high image quality"],
-    "solo" : ["solo", "alone", "single person", "single character", "single view", "protagonist"],
-    "solo focus" : ["focus on single character", "solo focus", "single character focus"],
-    "long hair" : ["long hair", "long haired", "long haired character"],
-    "looking at viewer" : ["looking at camera", "looking at viewer", "eye contact", "looking at you"],
-    "blush" : ["blush", "blushing", "embarrassed"],
-    "simple background" : ["simple background", "plain background", "simple bg", "focus on character"],
-    "full body" : ["full body", "full body shot", "full body view"],
-    "upper body" : ["upper body", "upper body shot", "upper body view", "focusing on torso", "without legs focus"],
-    "lower body" : ["lower body", "lower body shot", "lower body view", "without head focus"],
-    "monochrome" : ["monochrome", "single toned", "gradient with one color"],
-    "cowboy shot" : ["cowboy shot", "cowboy angle", "cowboy view", "cropped at thighs"],
-    "greyscale" : ["greyscale", "grayscale", "without color", "black and white"],
-    "nude" : ["nude", "naked", "nude character"],
-    "alternate costume" : ["alternate costume", "alternate outfit", "alternate attire"],
-    "day" : ["day", "daytime", "daylight", "sunny"],
-    "night" : ["night", "nighttime", "dark", "moonlight"],
-    "shadow" : ["shadow", "shadows", "shadowed", "shading"],
-    "artist name" : ["artist name", "artist signature"],
-    "close-up" : ["close-up", "close up", "closeup", "close shot", "close view"],
-    "mugshot" :["mugshot", "mug shot", "mugshot view", "mug shot view", "criminal photo"],
-    "lineup" : ["lineup", "line up", "line-up", "group shot", "group photo"],
-    "signature" : ["signature", "artist signature"],
-    "profile" : ["profile", "side profile", "profile view", "side view", "from side"],
-    "multiple views" : ["multiple views", "various views", "multiple shots", "various shots", "different views", "diverse variations"],
-    "from above" : ["from above", "aerial view", "top view", "high angle"],
-    "from below" : ["from below", "low angle", "from beneath", "from under"],
-    "from behind" : ["from behind", "rear view", "from the back", "back view"],
-    "from side" : ["from side", "side view", "lateral view", "profile view"],
-    "straight-on" : ["straight-on", "front view", "frontal view", "direct view"],
-    "looking back" : ["looking back", "looking behind", "looking over shoulder"],
-    "dutch angle" : ["dutch angle", "tilted angle", "slanted angle", "german angle", "oblique angle"],
-    "sideways" : ["sideways", "rotated image"],
-    "general" : ["general", "", "safe for work", "sfw"],
-    "sensitive" : ["sfw", "casual", "sensitive"],
-    "questionable" : ["nsfw", "with partial nudity", "questionable", "questionable content"],
-    "explicit" : ["explicit", "nsfw", "with nudity", "adult content", "explicit material"],
-}
-
-def convert_tags_if_needed(tags):
-    converted = []
-    for t in tags:
-        if t in CONVERTABLE_DICT:
-            converted.append(random.choice(CONVERTABLE_DICT[t]))
-        else:
-            converted.append(t)
-    return converted
 
 # region dataset
 
@@ -211,14 +157,25 @@ IMAGE_TRANSFORMS = transforms.Compose(
 )
 
 TEXT_ENCODER_OUTPUTS_CACHE_SUFFIX = "_te_outputs.npz"
+SKIP_PATH_CHECK = False
 
+def set_skip_path_check(skip: bool):
+    global SKIP_PATH_CHECK
+    SKIP_PATH_CHECK = skip
+
+def os_path_exists(path):
+    """
+    Check if the path exists. Skips if 
+    """
+    if SKIP_PATH_CHECK: # this is necessary for NFS systems
+        return True
+    return os.path.exists(path)
 
 class ImageInfo:
     def __init__(self, image_key: str, num_repeats: int, caption: str, is_reg: bool, absolute_path: str) -> None:
         self.image_key: str = image_key
         self.num_repeats: int = num_repeats
         self.caption: str = caption
-        self.captions: List[str] = [caption]
         self.is_reg: bool = is_reg
         self.absolute_path: str = absolute_path
         self.image_size: Tuple[int, int] = None
@@ -236,28 +193,7 @@ class ImageInfo:
         self.text_encoder_outputs1: Optional[torch.Tensor] = None
         self.text_encoder_outputs2: Optional[torch.Tensor] = None
         self.text_encoder_pool2: Optional[torch.Tensor] = None
-        self.supports_multiple_caption: bool = False
 
-    def get_caption(self, random_instance=None):
-        """
-        Returns caption to be used for training
-        """
-        if self.supports_multiple_caption:
-            if random_instance is None:
-                return random.choice(self.captions)
-            return random_instance.choice(self.captions)
-        else:
-            return self.caption
-
-class MultiCaptionImageInfo(ImageInfo):
-    """
-    Image Info Class that supports multiple captions
-    """
-    def __init__(self, image_key: str, num_repeats: int, captions: List[str], is_reg: bool, absolute_path: str) -> None:
-        assert len(captions) > 0, "captions must be a list of strings"
-        super().__init__(image_key, num_repeats, captions[0], is_reg, absolute_path)
-        self.captions: List[str] = captions
-        self.supports_multiple_caption = True
 
 class BucketManager:
     def __init__(self, no_upscale, max_reso, min_size, max_size, reso_steps) -> None:
@@ -453,7 +389,19 @@ class AugHelper:
 
     def get_augmentor(self, use_color_aug: bool):  # -> Optional[Callable[[np.ndarray], Dict[str, np.ndarray]]]:
         return self.color_aug if use_color_aug else None
-
+def shuffle_caption_by_separtor(caption, separator, caption_splitter):
+    splitted_parts = caption.split(separator)
+    #random.shuffle(splitted_parts)
+    splitted_parts = [c.strip().split(caption_splitter) for c in splitted_parts if c.strip()]
+    splitted_parts = [[c.strip() for c in parts if c.strip()] for parts in splitted_parts if parts]
+    for parts in splitted_parts:
+        random.shuffle(parts)
+    # returns first and others
+    if len(splitted_parts) == 1:
+        return splitted_parts[0], []
+    # flatten
+    flex_part = [c for parts in splitted_parts[1:] for c in parts]
+    return splitted_parts[0], flex_part
 
 class BaseSubset:
     def __init__(
@@ -477,7 +425,6 @@ class BaseSubset:
         caption_suffix: Optional[str],
         token_warmup_min: int,
         token_warmup_step: Union[float, int],
-        multi_captions: bool = False,
     ) -> None:
         self.image_dir = image_dir
         self.num_repeats = num_repeats
@@ -529,7 +476,6 @@ class DreamBoothSubset(BaseSubset):
         caption_suffix,
         token_warmup_min,
         token_warmup_step,
-        multi_captions: bool = False,
     ) -> None:
         assert image_dir is not None, "image_dir must be specified / image_dirは指定が必須です"
 
@@ -591,7 +537,6 @@ class FineTuningSubset(BaseSubset):
         caption_suffix,
         token_warmup_min,
         token_warmup_step,
-        multi_captions: bool = False,
     ) -> None:
         assert metadata_file is not None, "metadata_file must be specified / metadata_fileは指定が必須です"
 
@@ -615,7 +560,6 @@ class FineTuningSubset(BaseSubset):
             caption_suffix,
             token_warmup_min,
             token_warmup_step,
-            multi_captions
         )
 
         self.metadata_file = metadata_file
@@ -687,19 +631,6 @@ class ControlNetSubset(BaseSubset):
             return NotImplemented
         return self.image_dir == other.image_dir and self.conditioning_data_dir == other.conditioning_data_dir
 
-def shuffle_caption_by_separtor(caption, separator, caption_splitter):
-    splitted_parts = caption.split(separator)
-    #random.shuffle(splitted_parts)
-    splitted_parts = [c.strip().split(caption_splitter) for c in splitted_parts if c.strip()]
-    splitted_parts = [[c.strip() for c in parts if c.strip()] for parts in splitted_parts if parts]
-    for parts in splitted_parts:
-        random.shuffle(parts)
-    # returns first and others
-    if len(splitted_parts) == 1:
-        return splitted_parts[0], []
-    # flatten
-    flex_part = [c for parts in splitted_parts[1:] for c in parts]
-    return splitted_parts[0], flex_part
 
 class BaseDataset(torch.utils.data.Dataset):
     def __init__(
@@ -794,13 +725,7 @@ class BaseDataset(torch.utils.data.Dataset):
     def add_replacement(self, str_from, str_to):
         self.replacements[str_from] = str_to
 
-    def process_caption(self, subset: BaseSubset, caption, imageinfo: ImageInfo = None, random_instance=None):
-        """
-        Processes caption by adding prefix/suffix and applying dropout in runtime.
-        """
-        if imageinfo and imageinfo.supports_multiple_caption:
-            # マルチキャプション対応
-            caption = imageinfo.get_caption(random_instance)
+    def process_caption(self, subset: BaseSubset, caption):
         # caption に prefix/suffix を付ける
         if subset.caption_prefix:
             caption = subset.caption_prefix + " " + caption
@@ -938,71 +863,59 @@ class BaseDataset(torch.utils.data.Dataset):
                         "boy",
                         "other",
                         "explicit",
-                        "questionable",
                         "ai-generated" # mark the image is generated by AI
                     ] # The tokens that contains this will not be dropped
-                    strict_no_dropout_tokens = [
-                        "explicit",
-                        "questionable",
-                        "nsfw",
-                        "nudity",
-                        "adult content",
-                    ]
                     len_tokens = len(tokens)
                     if len_tokens < 10:
-                        if random.random() < 0.25:
-                            l.append("extremely simple caption")
+                        l.append("extremely simple caption")
                         return tokens
-                    if random.random() < 0.10:
+                    if random.random() < 0.05:
                         target_tokens = max(10, int(len_tokens * 0.3))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
                         if len(l) <= 50:
-                            if random.random() < 0.25:
-                                l.append("very simple caption")
-                    elif random.random() < 0.10:
-                        target_tokens = max(15, int(len_tokens * 0.4))
+                            l.append("very simple caption")
+                    elif random.random() < 0.05:
+                        target_tokens = min(10, int(len_tokens * 0.4))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
                         if len(l) <= 50:
-                            if random.random() < 0.25:
-                                l.append("simple caption")
-                    elif random.random() < 0.10:
+                            l.append("extremely simple caption")
+                    elif random.random() < 0.05:
+                        target_tokens = max(10, int(len_tokens * 0.4))
+                        selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                                l.append(token)
+                        if len(l) <= 50:
+                            l.append("simple caption")
+                    elif random.random() < 0.05:
                         # use only max 6 tokens
                         target_tokens = min(6, len_tokens)
                         selected_token_indices = random.sample(range(len_tokens), target_tokens)
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
-                        if random.random() < 0.25:
-                            l.append("extremely simple caption")
-                    elif random.random() < 0.002:
-                        # use only max 1-5 tokens
-                        target_tokens = min(len_tokens, random.randint(1, 5))
-                        selected_token_indices = random.sample(range(len_tokens), target_tokens)
-                        for i, token in enumerate(tokens):
-                            if i in selected_token_indices or any(t in token for t in strict_no_dropout_tokens):
-                                l.append(token)
+                        l.append("extremely simple caption")
                     else:
-                        target_tokens = max(1, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
+                        target_tokens = max(10, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
                     if len(l) > 10:
-                        if random.random() < 0.5:
-                            l += ["detailed caption"]
+                        l += ["detailed caption"]
                     return l
 
-                #if subset.shuffle_caption:
-                #    random.shuffle(flex_tokens)
+                if subset.shuffle_caption:
+                    random.shuffle(flex_tokens)
 
                 flex_tokens = dropout_tags(flex_tokens)
-                fixed_tokens, flex_tokens = convert_tags_if_needed(fixed_tokens), convert_tags_if_needed(flex_tokens)
+                flex_tokens_translated = translate_tags(flex_tokens, max(0.1, 0.8 * (self.current_step / self.max_train_steps)))
 
                 caption = ", ".join(fixed_tokens + flex_tokens + fixed_suffix_tokens)
 
@@ -1022,7 +935,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     caption = caption.replace(str_from, str_to)
         if not is_drop_out and subset.caption_tag_dropout_rate == 0 and subset.token_warmup_step == 0:
             assert caption, "caption should not be empty if not dropout, warmup, or tag dropout"
-        log_every(f"caption: {caption}, {subset.shuffle_caption}", 3000)
+        log_every(f"caption: {caption}", 3000)
         return caption
 
     def get_input_ids(self, caption, tokenizer=None):
@@ -1215,7 +1128,7 @@ class BaseDataset(torch.utils.data.Dataset):
         batches = []
         batch = []
         logger.info("checking cache validity...")
-        for image_idx, info in tqdm(enumerate(image_infos)):
+        for info in tqdm(image_infos):
             subset = self.image_to_subset[info.image_key]
 
             if info.latents_npz is not None:  # fine tuning dataset
@@ -1224,10 +1137,9 @@ class BaseDataset(torch.utils.data.Dataset):
             # check disk cache exists and size of latents
             if cache_to_disk:
                 info.latents_npz = os.path.splitext(info.absolute_path)[0] + ".npz"
-                current_device_index = accelerator.state.local_process_index
-                total_device_index = accelerator.state.num_processes
-                if image_idx % total_device_index != current_device_index:
+                if not is_main_process:  # store to info only
                     continue
+
                 cache_available = is_disk_cached_latents_is_expected(info.bucket_reso, info.latents_npz, subset.flip_aug)
 
                 if cache_available:  # do not add to batch
@@ -1510,8 +1422,7 @@ class BaseDataset(torch.utils.data.Dataset):
                 text_encoder_pool2_list.append(text_encoder_pool2)
                 captions.append(caption)
             else:
-                # Dynamic runtime-based caption processing
-                caption = self.process_caption(subset, image_info.caption, image_info)
+                caption = self.process_caption(subset, image_info.caption)
                 if self.XTI_layers:
                     caption_layer = []
                     for layer in self.XTI_layers:
@@ -1667,7 +1578,6 @@ class DreamBoothDataset(BaseDataset):
         bucket_no_upscale: bool,
         prior_loss_weight: float,
         debug_dataset: bool,
-        multi_captions: bool = False,
     ) -> None:
         super().__init__(tokenizer, max_token_length, resolution, network_multiplier, debug_dataset)
 
@@ -1875,9 +1785,6 @@ class DreamBoothDataset(BaseDataset):
 
 
 class FineTuningDataset(BaseDataset):
-    """
-    FineTuningDataset is a dataset for fine-tuning.
-    """
     def __init__(
         self,
         subsets: Sequence[FineTuningSubset],
@@ -1892,7 +1799,6 @@ class FineTuningDataset(BaseDataset):
         bucket_reso_steps: int,
         bucket_no_upscale: bool,
         debug_dataset: bool,
-        multi_captions: bool = False,
     ) -> None:
         super().__init__(tokenizer, max_token_length, resolution, network_multiplier, debug_dataset)
 
@@ -1934,7 +1840,7 @@ class FineTuningDataset(BaseDataset):
                 abs_path = None
 
                 # まず画像を優先して探す
-                if os_path_exists(image_key) or os_path_exists(os.path.splitext(image_key)[0] + ".npz"):
+                if os_path_exists(image_key):
                     abs_path = image_key
                 else:
                     # わりといい加減だがいい方法が思いつかん
@@ -1952,25 +1858,9 @@ class FineTuningDataset(BaseDataset):
                             abs_path = npz_path
 
                 assert abs_path is not None, f"no image / 画像がありません: {image_key}"
-                captions = img_md.get("captions", None)
+
+                caption = img_md.get("caption")
                 tags = img_md.get("tags")
-                if captions is not None: # Multi captions
-                    # captionsがある場合はcaptionを取り出す
-                    assert len(captions) > 0, f"captions is empty / captionsが空です: {image_key}"
-                    assert isinstance(captions, list), f"captions is not list / captionsがリストではありません: {image_key}"
-                    assert all(isinstance(x, str) for x in captions), f"captions is not list of str / captionsが文字列のリストではありません: {image_key}"
-                    caption = captions[0]
-                    if tags is not None and len(tags) > 0:
-                        captions = [c + ", " + tags for c in captions]
-                else: # Single caption
-                    caption = img_md.get("caption")
-                    if caption is None:
-                        caption = tags
-                    elif tags is not None and len(tags) > 0:
-                        caption = caption + ", " + tags
-                        tags_list.append(tags)
-                    captions = [caption]
-                # Now, caption is not None
                 if caption is None:
                     caption = tags  # could be multiline
                     tags = None
@@ -2134,7 +2024,6 @@ class ControlNetDataset(BaseDataset):
         bucket_reso_steps: int,
         bucket_no_upscale: bool,
         debug_dataset: float,
-        multi_captions: bool = False,
     ) -> None:
         super().__init__(tokenizer, max_token_length, resolution, network_multiplier, debug_dataset)
 
@@ -3344,7 +3233,7 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
     )
     parser.add_argument("--seed", type=int, default=None, help="random seed for training / 学習時の乱数のseed")
     parser.add_argument(
-        "--gradient_checkpointing", action="store_true", help="enable gradient checkpointing / grandient checkpointingを有効にする"
+        "--gradient_checkpointing", action="store_true", help="enable gradient checkpointing / gradient checkpointingを有効にする"
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
@@ -3549,9 +3438,6 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
         help="file for prompts to generate sample images / 学習中モデルのサンプル出力用プロンプトのファイル",
     )
     parser.add_argument(
-        "--multi-captions", type=bool, default=False, help="use multi-captions for training. Specify as 'captions' key, value List[str] / 学習時にマルチキャプションを使用する"
-    )
-    parser.add_argument(
         "--sample_sampler",
         type=str,
         default="ddim",
@@ -3623,6 +3509,7 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
         parser.add_argument(
             "--prior_loss_weight", type=float, default=1.0, help="loss weight for regularization images / 正則化画像のlossの重み"
         )
+
 
 def add_masked_loss_arguments(parser: argparse.ArgumentParser):
     parser.add_argument(
@@ -3955,6 +3842,12 @@ def add_sd_saving_arguments(parser: argparse.ArgumentParser):
         help="use safetensors format to save (if save_model_as is not specified) / checkpoint、モデルをsafetensors形式で保存する（save_model_as未指定時）",
     )
 
+def add_skip_check_arguments(parser: argparse.ArgumentParser):
+    parser.add_argument(
+        "--skip_file_existence_check",
+        action="store_true",
+        help="skip check for images and latents existence, useful if your storage has low random access speed / 画像とlatentの存在チェックをスキップする。ストレージのランダムアクセス速度が遅い場合に有用",
+    )
 
 def read_config_from_file(args: argparse.Namespace, parser: argparse.ArgumentParser):
     if not args.config_file:
@@ -4542,7 +4435,7 @@ def prepare_accelerator(args: argparse.Namespace):
                 os.makedirs(logging_dir, exist_ok=True)
                 os.environ["WANDB_DIR"] = logging_dir
             if args.wandb_api_key is not None:
-                wandb.login(key=args.wandb_api_key, timeout=300)
+                wandb.login(key=args.wandb_api_key)
 
     # torch.compile のオプション。 NO の場合は torch.compile は使わない
     dynamo_backend = "NO"
@@ -4640,24 +4533,22 @@ def _load_target_model(args: argparse.Namespace, weight_dtype, device="cpu", une
 
 
 def load_target_model(args, weight_dtype, accelerator, unet_use_linear_projection_in_v2=False):
-    for pi in range(accelerator.state.num_processes):
-        if pi == accelerator.state.local_process_index:
-            logger.info(f"loading model for process {accelerator.state.local_process_index}/{accelerator.state.num_processes}")
+    logger.info(f"loading model for process {accelerator.state.local_process_index}/{accelerator.state.num_processes}, {accelerator.process_index}")
+    text_encoder, vae, unet, load_stable_diffusion_format = _load_target_model(
+        args,
+        weight_dtype,
+        accelerator.device if args.lowram else "cpu",
+        unet_use_linear_projection_in_v2=unet_use_linear_projection_in_v2,
+    )
+    # work on low-ram device
+    if args.lowram:
+        text_encoder.to(accelerator.device)
+        unet.to(accelerator.device)
+        vae.to(accelerator.device)
 
-            text_encoder, vae, unet, load_stable_diffusion_format = _load_target_model(
-                args,
-                weight_dtype,
-                accelerator.device if args.lowram else "cpu",
-                unet_use_linear_projection_in_v2=unet_use_linear_projection_in_v2,
-            )
-            # work on low-ram device
-            if args.lowram:
-                text_encoder.to(accelerator.device)
-                unet.to(accelerator.device)
-                vae.to(accelerator.device)
-
-            clean_memory_on_device(accelerator.device)
-        accelerator.wait_for_everyone()
+    clean_memory_on_device(accelerator.device)
+    logger.info(f"Model loaded for process {accelerator.state.local_process_index}/{accelerator.state.num_processes}, {accelerator.process_index}")
+    accelerator.wait_for_everyone()
     return text_encoder, vae, unet, load_stable_diffusion_format
 
 
@@ -5460,11 +5351,10 @@ def sample_images_common(
         pass
     image_paths = []
     if distributed_state.num_processes <= 1:
-        image_paths = []
         # If only one device is available, just use the original prompt list. We don't need to care about the distribution of prompts.
         with torch.no_grad():
             for prompt_dict in prompts:
-                image_paths += [sample_image_inference(
+                image_paths = [sample_image_inference(
                     accelerator, args, pipeline, save_dir, prompt_dict, epoch, steps, prompt_replacement, controlnet=controlnet
                 )]
     else:
@@ -5473,7 +5363,7 @@ def sample_images_common(
         per_process_prompts = []  # list of lists
         for i in range(distributed_state.num_processes):
             per_process_prompts.append(prompts[i :: distributed_state.num_processes])
-        image_paths = []
+
         with torch.no_grad():
             with distributed_state.split_between_processes(per_process_prompts) as prompt_dict_lists:
                 for prompt_dict in prompt_dict_lists[0]:
@@ -5616,7 +5506,6 @@ def sample_image_inference(
     img_filename = f"{'' if args.output_name is None else args.output_name + '_'}{num_suffix}_{i:02d}_{ts_str}{seed_suffix}.png"
     image.save(os.path.join(save_dir, img_filename))
     return os.path.join(save_dir, img_filename)
-
 
 # endregion
 
