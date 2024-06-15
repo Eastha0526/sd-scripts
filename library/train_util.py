@@ -116,11 +116,11 @@ STEP_DIFFUSERS_DIR_NAME = "{}-step{:08d}"
 # synonyms
 CONVERTABLE_DICT = {
     "masterpiece" : ["amazing quality", "masterpiece", "masterpiece quality", "top quality", "most preferred", "professional"],
-    "best quality" : ["best quality", "good", "high quality", "preferred"],
-    "bad quality" : ["bad quality", "low quality", "poor quality",],
-    "worst quality" : ["displeasing", "worst drawing", "amateur"],
-    "1girl" : ["one girl", "female", "girl", "female"],
-    "1boy" : ["one boy", "one male", "boy", "male"],
+    "best quality" : ["best quality", "good", "high quality", "preferred", "best drawing", "best"],
+    "bad quality" : ["bad quality", "low quality", "poor quality", "bad drawing", "badly drawn"],
+    "worst quality" : ["displeasing", "worst drawing", "amateur", "worst quality"],
+    "1girl" : ["one girl", "female", "girl", "female", "1girl"],
+    "1boy" : ["one boy", "one male", "boy", "male", "1boy"],
     "lineart" : ["line drawing", "lineart", "line art"],
     "no lineart" : ["no lineart", "vector art", "without lines"],
     "lowres" : ["low resolution", "lowres", "low res", "low image quality"],
@@ -129,24 +129,29 @@ CONVERTABLE_DICT = {
     "doctor (arknights)" : ["doctor (arknights)", "arknights doctor", "arknights protagonist"],
     "female doctor (arknights)" : ["female doctor (arknights)", "arknights female doctor"],
     "highres" : ["high resolution", "highres", "high res", "high image quality"],
-    "solo" : ["solo", "alone", "single person", "single character", "single view"],
+    "solo" : ["solo", "alone", "single person", "single character", "single view", "protagonist"],
     "solo focus" : ["focus on single character", "solo focus", "single character focus"],
     "long hair" : ["long hair", "long haired", "long haired character"],
-    "looking at viewer" : ["looking at camera", "looking at viewer"],
+    "looking at viewer" : ["looking at camera", "looking at viewer", "eye contact", "looking at you"],
     "blush" : ["blush", "blushing", "embarrassed"],
-    "simple background" : ["simple background", "plain background", "simple bg"],
+    "simple background" : ["simple background", "plain background", "simple bg", "focus on character"],
     "full body" : ["full body", "full body shot", "full body view"],
-    "upper body" : ["upper body", "upper body shot", "upper body view"],
-    "lower body" : ["lower body", "lower body shot", "lower body view"],
-    "monochrome" : ["monochrome", "single tonee", "gradient colorization"],
-    "cowboy shot" : ["cowboy shot", "cowboy angle", "cowboy view"],
-    "greyscale" : ["greyscale", "grayscale"],
+    "upper body" : ["upper body", "upper body shot", "upper body view", "focusing on torso", "without legs focus"],
+    "lower body" : ["lower body", "lower body shot", "lower body view", "without head focus"],
+    "monochrome" : ["monochrome", "single toned", "gradient with one color"],
+    "cowboy shot" : ["cowboy shot", "cowboy angle", "cowboy view", "cropped at thighs"],
+    "greyscale" : ["greyscale", "grayscale", "without color", "black and white"],
     "nude" : ["nude", "naked", "nude character"],
     "alternate costume" : ["alternate costume", "alternate outfit", "alternate attire"],
-    "day" : ["day", "daytime", "daylight"],
+    "day" : ["day", "daytime", "daylight", "sunny"],
+    "night" : ["night", "nighttime", "dark", "moonlight"],
     "shadow" : ["shadow", "shadows", "shadowed", "shading"],
     "artist name" : ["artist name", "artist signature"],
+    "close-up" : ["close-up", "close up", "closeup", "close shot", "close view"],
+    "mugshot" :["mugshot", "mug shot", "mugshot view", "mug shot view", "criminal photo"],
+    "lineup" : ["lineup", "line up", "line-up", "group shot", "group photo"],
     "signature" : ["signature", "artist signature"],
+    "profile" : ["profile", "side profile", "profile view", "side view", "from side"],
     "multiple views" : ["multiple views", "various views", "multiple shots", "various shots", "different views", "diverse variations"],
     "from above" : ["from above", "aerial view", "top view", "high angle"],
     "from below" : ["from below", "low angle", "from beneath", "from under"],
@@ -156,6 +161,10 @@ CONVERTABLE_DICT = {
     "looking back" : ["looking back", "looking behind", "looking over shoulder"],
     "dutch angle" : ["dutch angle", "tilted angle", "slanted angle", "german angle", "oblique angle"],
     "sideways" : ["sideways", "rotated image"],
+    "general" : ["general", "", "safe for work", "sfw"],
+    "sensitive" : ["sfw", "casual", "sensitive"],
+    "questionable" : ["nsfw", "with partial nudity", "questionable", "questionable content"],
+    "explicit" : ["explicit", "nsfw", "with nudity", "adult content", "explicit material"],
 }
 
 def convert_tags_if_needed(tags):
@@ -932,9 +941,16 @@ class BaseDataset(torch.utils.data.Dataset):
                         "questionable",
                         "ai-generated" # mark the image is generated by AI
                     ] # The tokens that contains this will not be dropped
+                    strict_no_dropout_tokens = [
+                        "explicit",
+                        "questionable",
+                        "nsfw",
+                        "nudity",
+                        "adult content",
+                    ]
                     len_tokens = len(tokens)
                     if len_tokens < 10:
-                        if random.random() < 0.5:
+                        if random.random() < 0.25:
                             l.append("extremely simple caption")
                         return tokens
                     if random.random() < 0.10:
@@ -944,7 +960,7 @@ class BaseDataset(torch.utils.data.Dataset):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
                         if len(l) <= 50:
-                            if random.random() < 0.5:
+                            if random.random() < 0.25:
                                 l.append("very simple caption")
                     elif random.random() < 0.10:
                         target_tokens = max(15, int(len_tokens * 0.4))
@@ -953,7 +969,7 @@ class BaseDataset(torch.utils.data.Dataset):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
                         if len(l) <= 50:
-                            if random.random() < 0.5:
+                            if random.random() < 0.25:
                                 l.append("simple caption")
                     elif random.random() < 0.10:
                         # use only max 6 tokens
@@ -962,8 +978,15 @@ class BaseDataset(torch.utils.data.Dataset):
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
                                 l.append(token)
-                        if random.random() < 0.5:
+                        if random.random() < 0.25:
                             l.append("extremely simple caption")
+                    elif random.random() < 0.002:
+                        # use only max 1-5 tokens
+                        target_tokens = min(len_tokens, random.randint(1, 5))
+                        selected_token_indices = random.sample(range(len_tokens), target_tokens)
+                        for i, token in enumerate(tokens):
+                            if i in selected_token_indices or any(t in token for t in strict_no_dropout_tokens):
+                                l.append(token)
                     else:
                         target_tokens = max(1, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
