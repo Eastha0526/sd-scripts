@@ -214,8 +214,8 @@ TEXT_ENCODER_OUTPUTS_CACHE_SUFFIX = "_te_outputs.npz"
 
 
 class ImageInfo:
-    def __init__(self, image_key: str, num_repeats: int, caption: str, is_reg: bool, absolute_path: str) -> None:
-        self.image_key: str = image_key
+    def __init__(self, image_key: str, num_repeats: int, caption: str, is_reg: bool, absolute_path: str, subset_idx: int) -> None:
+        self.image_key: str = image_key + "_" + str(subset_idx)
         self.num_repeats: int = num_repeats
         self.caption: str = caption
         self.captions: List[str] = [caption]
@@ -237,6 +237,7 @@ class ImageInfo:
         self.text_encoder_outputs2: Optional[torch.Tensor] = None
         self.text_encoder_pool2: Optional[torch.Tensor] = None
         self.supports_multiple_caption: bool = False
+        self.subset_idx: int = subset_idx
 
     def get_caption(self, random_instance=None):
         """
@@ -1073,8 +1074,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
             input_ids = torch.stack(iids_list)  # 3,77
         return input_ids
-
-    def register_image(self, info: ImageInfo, subset: BaseSubset):
+    def register_image(self, info: ImageInfo, subset: BaseSubset, subset_idx: int):
         self.image_data[info.image_key] = info
         self.image_to_subset[info.image_key] = subset
 
@@ -1809,7 +1809,7 @@ class DreamBoothDataset(BaseDataset):
         num_train_images = 0
         num_reg_images = 0
         reg_infos: List[Tuple[ImageInfo, DreamBoothSubset]] = []
-        for subset in subsets:
+        for subset_idx, subset in enumerate(subsets):
             if subset.num_repeats < 1:
                 logger.warning(
                     f"ignore subset with image_dir='{subset.image_dir}': num_repeats is less than 1 / num_repeatsが1を下回っているためサブセットを無視します: {subset.num_repeats}"
@@ -1835,13 +1835,13 @@ class DreamBoothDataset(BaseDataset):
                 num_train_images += subset.num_repeats * len(img_paths)
 
             for img_path, caption, size in zip(img_paths, captions, sizes):
-                info = ImageInfo(img_path, subset.num_repeats, caption, subset.is_reg, img_path)
+                info = ImageInfo(img_path, subset.num_repeats, caption, subset.is_reg, img_path, subset_idx)
                 if size is not None:
                     info.image_size = size
                 if subset.is_reg:
                     reg_infos.append((info, subset))
                 else:
-                    self.register_image(info, subset)
+                    self.register_image(info, subset, subset_idx)
 
             subset.img_count = len(img_paths)
             self.subsets.append(subset)
@@ -1862,7 +1862,7 @@ class DreamBoothDataset(BaseDataset):
             while n < num_train_images:
                 for info, subset in reg_infos:
                     if first_loop:
-                        self.register_image(info, subset)
+                        self.register_image(info, subset, subset_idx)
                         n += info.num_repeats
                     else:
                         info.num_repeats += 1  # rewrite registered info
@@ -1901,7 +1901,7 @@ class FineTuningDataset(BaseDataset):
         self.num_train_images = 0
         self.num_reg_images = 0
 
-        for subset in subsets:
+        for subset_idx, subset in enumerate(subsets):
             if subset.num_repeats < 1:
                 logger.warning(
                     f"ignore subset with metadata_file='{subset.metadata_file}': num_repeats is less than 1 / num_repeatsが1を下回っているためサブセットを無視します: {subset.num_repeats}"
@@ -1994,14 +1994,14 @@ class FineTuningDataset(BaseDataset):
                 if caption is None:
                     caption = ""
 
-                image_info = ImageInfo(image_key, subset.num_repeats, caption, False, abs_path)
+                image_info = ImageInfo(image_key, subset.num_repeats, caption, False, abs_path, subset_idx)
                 image_info.image_size = img_md.get("train_resolution")
 
                 if not subset.color_aug and not subset.random_crop:
                     # if npz exists, use them
                     image_info.latents_npz, image_info.latents_npz_flipped = self.image_key_to_npz_file(subset, image_key)
 
-                self.register_image(image_info, subset)
+                self.register_image(image_info, subset, subset_idx)
 
             self.num_train_images += len(metadata) * subset.num_repeats
 
