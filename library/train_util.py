@@ -212,6 +212,8 @@ IMAGE_TRANSFORMS = transforms.Compose(
 
 TEXT_ENCODER_OUTPUTS_CACHE_SUFFIX = "_te_outputs.npz"
 
+def create_very_random_alphanumeric(length):
+    return "".join(random.choices("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=length))
 
 class ImageInfo:
     def __init__(self, image_key: str, num_repeats: int, caption: str, is_reg: bool, absolute_path: str, subset_idx: int) -> None:
@@ -997,6 +999,16 @@ class BaseDataset(torch.utils.data.Dataset):
                     if len(l) > 10:
                         if random.random() < 0.5:
                             l += ["detailed caption"]
+                    if random.random() < 0.02:
+                        # add random alphanum (5~10 characters)
+                        l.append(create_very_random_alphanumeric(random.randint(5, 10)))
+                    # for tokens, randomly capitalize or uncapitalize first letter
+                    for i, token in enumerate(l):
+                        if random.random() < 0.1:
+                            if random.random() < 0.1:
+                                l[i] = token.capitalize()
+                            else:
+                                l[i] = token.lower()
                     return l
 
                 #if subset.shuffle_caption:
