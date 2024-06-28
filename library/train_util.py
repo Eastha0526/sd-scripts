@@ -960,7 +960,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         target_tokens = max(10, int(len_tokens * 0.3))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
-                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens) or any(t in token for t in strict_no_dropout_tokens):
                                 l.append(token)
                         if len(l) <= 50:
                             if random.random() < 0.25:
@@ -969,7 +969,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         target_tokens = max(15, int(len_tokens * 0.4))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
-                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens) or any(t in token for t in strict_no_dropout_tokens):
                                 l.append(token)
                         if len(l) <= 50:
                             if random.random() < 0.25:
@@ -979,7 +979,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         target_tokens = min(6, len_tokens)
                         selected_token_indices = random.sample(range(len_tokens), target_tokens)
                         for i, token in enumerate(tokens):
-                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens) or any(t in token for t in strict_no_dropout_tokens):
                                 l.append(token)
                         if random.random() < 0.25:
                             l.append("extremely simple caption")
@@ -994,7 +994,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         target_tokens = max(1, int(len_tokens * (1 - subset.caption_tag_dropout_rate * random.random())))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
-                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens):
+                            if i in selected_token_indices or any(t in token for t in no_dropout_tokens) or any(t in token for t in strict_no_dropout_tokens):
                                 l.append(token)
                     if len(l) > 10:
                         if random.random() < 0.5:
