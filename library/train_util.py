@@ -33,6 +33,7 @@ import toml
 
 from tqdm import tqdm
 
+from numpy import array_split
 import torch
 from library.device_utils import init_ipex, clean_memory_on_device
 from library.strategy_base import LatentsCachingStrategy, TokenizeStrategy, TextEncoderOutputsCachingStrategy, TextEncodingStrategy
@@ -1908,6 +1909,14 @@ class FineTuningDataset(BaseDataset):
                 logger.info(f"loading existing metadata: {subset.metadata_file}")
                 with open(subset.metadata_file, "rt", encoding="utf-8") as f:
                     metadata = json.load(f)
+                logger.info(f"loaded metadata: {subset.metadata_file}")
+                if os.environ.get("SPLIT_DATASET"):
+                    keys = sorted(metadata.keys())
+                    split_count = int(os.environ.get("SPLIT_DATASET"))
+                    current_split = int(os.environ.get("SPLIT_DATASET_IDX"))
+                    keys_to_use = array_split(keys, split_count)[current_split]
+                    metadata = {k: metadata[k] for k in keys_to_use}
+                    logger.info(f"split dataset: {len(metadata)} images")
             else:
                 raise ValueError(f"no metadata / メタデータファイルがありません: {subset.metadata_file}")
 
@@ -1918,7 +1927,7 @@ class FineTuningDataset(BaseDataset):
                 continue
 
             tags_list = []
-            for image_key, img_md in metadata.items():
+            for image_key, img_md in tqdm(metadata.items()):
                 # path情報を作る
                 abs_path = None
 
