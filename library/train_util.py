@@ -90,6 +90,7 @@ from library.original_unet import UNet2DConditionModel
 
 logger_logged_lines = 0
 def log_every(messages, n):
+    return #disable
     global logger_logged_lines
     if logger_logged_lines % n == 0:
        logger.info(messages)
@@ -119,8 +120,12 @@ CONVERTABLE_DICT = {
     "best quality" : ["best quality", "good", "high quality", "preferred", "best drawing", "best"],
     "bad quality" : ["bad quality", "low quality", "poor quality", "bad drawing", "badly drawn"],
     "worst quality" : ["displeasing", "worst drawing", "amateur", "worst quality"],
-    "1girl" : ["one girl", "female", "girl", "female", "1girl"],
-    "1boy" : ["one boy", "one male", "boy", "male", "1boy"],
+    "1girl" : ["one girl", "female", "girl", "female", "1girl", "woman"],
+    "1boy" : ["one boy", "one male", "boy", "male", "1boy", "man"],
+    "2boys" : ["two boys", "2boys", "2boy", "two male", "two men"],
+    "2girls" : ["2girls", "two girls", "two female", "two women"],
+    "3boys" : ["three boys", "3boys", "three male"],
+    "3girls" : ["three girls", "3girls", "three female"],
     "lineart" : ["line drawing", "lineart", "line art"],
     "no lineart" : ["no lineart", "vector art", "without lines"],
     "lowres" : ["low resolution", "lowres", "low res", "low image quality"],
@@ -161,11 +166,105 @@ CONVERTABLE_DICT = {
     "looking back" : ["looking back", "looking behind", "looking over shoulder"],
     "dutch angle" : ["dutch angle", "tilted angle", "slanted angle", "german angle", "oblique angle"],
     "sideways" : ["sideways", "rotated image"],
-    "general" : ["general", "", "safe for work", "sfw"],
+    "general" : ["general", "", "safe for work", "sfw", "safe"],
     "sensitive" : ["sfw", "casual", "sensitive"],
     "questionable" : ["nsfw", "with partial nudity", "questionable", "questionable content"],
     "explicit" : ["explicit", "nsfw", "with nudity", "adult content", "explicit material"],
 }
+
+popular_chars_names = ["momiji", "character", "futo", "inaba", "yor", "seija", "stout", "sakuya", "yazawa", "tamamo", "ellen", "d'arc", "murasa", "misaka", "hearn", "kisaragi", "kaku", "ichinose", "hatate", "suwako", "douji", "aqua", "yoko", "samidare", "kikuchi", "nilou", "yuyuko", "sekibanki", "asashio", "rumia", "megurine", "kotori", "formidable", "frieren", "satori", "shijou", "kyrielight", "kanako", "remilia", "koakuma", "gardevoir", "littner", "princess", "d.va", "saber", "higuchi", "koishi", "bridget", "minami", "inkling", "monster", "kokomi", "miho", "kasodani", "houraisan", "kongou", "two", "artoria", "chen", "pyra", "patchouli", "konpaku", "tojo", "mercury", "shinobu", "tewi", "suika", "izumi", "shiroko", "inazuma", "kurodani", "akemi", "fujiwara", "mononobe", "kokoro", "nagae", "azusa", "youmu", "oma", "kafka", "c.c.", "arisu", "abigail", "mae", "yumemi", "manhattan", "mona", "shirakami", "zhongli", "ran", "shibuya", "kawashiro", "kaenbyou", "zero", "nakano", "yuudachi", "tao", "eula", "girl", "hoshimachi", "kasen", "raiden", "yuugi", "takane", "murakumo", "hoshii", "watanabe", "no", "rio", "minamoto", "kaname", "minato", "pendragon", "williams", "udongein", "shower", "super", "ryuuko", "himekaidou", "mirko", "cammy", "sayaka", "riamu", "reimu", "yasaka", "komeiji", "nightbug", "tachyon", "kokichi", "lumine", "utsuho", "rem", "tatsumaki", "shimamura", "sonoda", "takagaki", "shenhe", "kagerou", "miki", "houjuu", "lillie", "nagato", "senketsu", "amami", "player", "byakuren", "junko", "asuna", "kashima", "komachi", "kinomoto", "power", "kagamine", "kirisame", "kogasa", "sanae", "souji", "nico", "seiga", "mokou", "aran", "iono", "black", "usami", "nazrin", "akiyama", "kamisato", "joe", "miku", "nozomi", "shooter", "hu", "nahida", "luka", "mythra", "claudius", "kyoko", "yagokoro", "iku", "aya", "kaede", "takina", "morrigan", "amiya", "gokou", "yoshika", "suzuya", "dawn", "kamishirasawa", "shuten", "okita", "joseph", "reisalin", "ruri", "haruka", "nitori", "marnie", "plana", "renko", "shameimaru", "samus", "makoto", "holo", "doll", "yuuka", "hinanawi", "hatsune", "shiranui", "daiyousei", "kanzaki", "magician", "rembran", "reiuji", "jougasaki", "tohsaka", "maki", "ibuki", "karin", "kai", "white", "oshino", "koharu", "bowsette", "eiki", "toki", "ayaka", "cafe", "sagiri", "yelan", "zeppeli", "zelda", "wriggle", "hata", "ganaha", "saigyouji", "shimakaze", "mayuzumi", "shogun", "lorelei", "einzbern", "fuyuko", "knowledge", "sonico", "tifa", "rensouhou-chan", "rin", "kyouko", "kaguya", "serval", "nino", "ranko", "madoka", "flandre", "kisaki", "hong", "illyasviel", "koume", "hamakaze", "chun-li", "miko", "oyama", "shanghai", "joestar", "uzuki", "umi", "yui", "kaga", "tomoe", "mika", "mash", "ganyu", "ibaraki", "fubuki", "miorine", "dark", "ayanami", "arona", "2b", "boo", "eirin", "kazusa", "mio", "aensland", "anthonio", "von", "meiling", "parsee", "you", "tachibana", "warrior", "kitagawa", "fumika", "marine", "yamame", "alter", "marisa", "rikka", "megumin", "moriya", "sparkle", "nishizumi", "matoi", "takao", "raikou", "briar", "minamitsu", "rei", "imaizumi", "asuka", "kazami", "hk416", "shiki", "nero", "keine", "amatsukaze", "karyl", "hina", "chino", "mari", "nanami", "izayoi", "yae", "onozuka", "nishikigi", "nishikino", "yamato", "makima", "suigintou", "sagisawa", "rock", "mizuhashi", "yotsuba", "chiaki", "len", "margatroid", "ushio", "mikoto", "ayase", "mai", "hitori", "venti", "agnes", "scathach", "yoimiya", "gawr", "sagume", "ooyodo", "reisen", "chihaya", "haruhi", "gumi", "akagi", "souryuu", "hirasawa", "homura", "shigure", "hibiki", "yuzuki", "acheron", "link", "sakura", "ryuujou", "atago", "inubashiri", "mami", "nue", "yukari", "eugen", "jeanne", "gura", "firefly", "of", "hestia", "ni", "anchovy", "haruna", "aru", "houshou", "gotoh", "akatsuki", "kishin", "alice", "kijin", "hijiri", "kagiyama", "yakumo", "suisei", "ro-500", "keqing", "testarossa", "scarlet", "iowa", "suletta", "tenshi", "langley", "lockhart", "tatara", "mystia", "adachi", "rosa", "hoshiguma", "yuki", "hakurei", "furina", "light", "daiwa", "mahiro", "aris", "suzumiya", "kochiya", "inoue", "fate", "nami", "hunter", "tenryuu", "shirasaka", "astolfo", "caesar", "prinz", "marin", "toyosatomimi", "kafuu", "takarada", "hoshino", "clownpiece", "eli", "cynthia", "miyako", "darjeeling", "sangonomiya", "chisato", "rice", "ikazuchi", "cirno", "maribel"]
+popular_chars_names = set(popular_chars_names) # for faster lookup
+no_dropout_tokens = [
+    # "low ",
+    "lineart",
+    "l" + "o" + "l" + "i" , # oh no
+    "shota", # these are critical tags...
+    " art",
+    "foreshortening",
+    "exaggerat",
+    "disembodied",
+    "rough",
+    "sketch",
+    "amateur",
+    "displeasing",
+    #"close up",
+    #"close-up",
+    "cropped",
+    "empty",
+    "plain",
+    # "from ",
+    # " body",
+    "multiple",
+    "artifact",
+    "toon",
+    "lowres",
+    "koma",
+    # "pov",
+    "censor",
+    "upside" # these are critical tags for image comprehension
+    "guro",
+    "scat",
+    "gore",
+    "cover", # now some scan / copyrighted material
+    "album",
+    "3d",
+    "render",
+    "name",
+    "logo",
+    "artist",
+    "sign",
+    "parody",
+    "manga",
+    "comic",
+    "letterbox",
+    "watermark",
+    "scan",
+    "doujin",
+    "anatomical nonsense", #for better body part recognition
+    "bad hands",
+    "bad feet",
+    "bad proportions",
+    "quality",
+    "bad aspect",
+    "extra digits",
+    "bad reflection",
+    "artistic",
+    "poorly drawn",
+    #"chromatic",
+    "chiaroscuro",
+    " medium",
+    "cropped",
+    "tomboy", # these are some case that model might be confused
+    "trap",
+    "tomgirl",
+    "crossdressing",
+    "androgynous",
+    "futa", 
+    "girl", # gender / persons are important
+    "boy",
+    "men",
+    "female",
+    "cosplay",
+    "male",
+    "other",
+    "explicit",
+    "questionable",
+    "simple",
+    "underwear",
+    "panties",
+    "background",
+    "abstract",
+    "monochrome", "single toned", "gradient with one color",
+    "greyscale",
+    "ai-generated" # mark the image is generated by AI
+] + [
+    "pus"+ "sy",
+    "nip"+"ple",
+    "pen"+"is",
+    "an" +"us" # sexual tokens should not be dropped and always checked
+    ]# The tokens that contains this will not be dropped
+
+no_dropout_tokens = set(no_dropout_tokens) + popular_chars_names
 
 def convert_tags_if_needed(tags):
     converted = []
@@ -887,82 +986,10 @@ class BaseDataset(torch.utils.data.Dataset):
                     if len(tokens) > 300:
                         while len(tokens) > 300:
                             tokens.pop(random.randint(0, len(tokens) - 1))
-                    if subset.caption_tag_dropout_rate <= 0:
+                    if subset.caption_tag_dropout_rate <= 0 or not subset.shuffle_caption:
                         return tokens
                     l = []
                     # We control tne 'unconditional' generation by captioning
-                    no_dropout_tokens = [
-                        # "low ",
-                        "lineart",
-                        "l" + "o" + "l" + "i" , # oh no
-                        "shota", # these are critical tags...
-                        " art",
-                        "foreshortening",
-                        "exaggerat",
-                        "disembodied",
-                        "rough",
-                        "sketch",
-                        "amateur",
-                        "displeasing",
-                        "close up",
-                        "close-up",
-                        "cropped",
-                        "empty",
-                        "plain",
-                        # "from ",
-                        # " body",
-                        "multiple",
-                        "artifact",
-                        "lowres",
-                        "koma",
-                        # "pov",
-                        "censor",
-                        "upside" # these are critical tags for image comprehension
-                        "guro",
-                        "scat",
-                        "gore",
-                        "cover", # now some scan / copyrighted material
-                        "manga",
-                        "comic",
-                        "letterbox",
-                        "watermark",
-                        "scan",
-                        "doujin",
-                        "anatomical nonsense", #for better body part recognition
-                        "bad hands",
-                        "bad feet",
-                        "bad proportions",
-                        "quality",
-                        "bad aspect",
-                        "extra digits",
-                        "bad reflection",
-                        "artistic",
-                        "poorly drawn",
-                        "chromatic",
-                        "chiaroscuro",
-                        " medium",
-                        "cropped",
-                        "tomboy", # these are some case that model might be confused
-                        "trap",
-                        "tomgirl",
-                        "crossdressing",
-                        "androgynous",
-                        "futa", 
-                        "girl", # gender / persons are important
-                        "boy",
-                        "female",
-                        "male",
-                        "other",
-                        "explicit",
-                        "questionable",
-                        "_hq",
-                        "ai-generated" # mark the image is generated by AI
-                    ] + [
-                        "pus"+ "sy",
-                        "nip"+"ple",
-                        "pen"+"is",
-                        "an" +"us" # sexual tokens should not be dropped and always checked
-                        ]# The tokens that contains this will not be dropped
                     strict_no_dropout_tokens = [
                         "explicit",
                         "questionable",
@@ -972,6 +999,15 @@ class BaseDataset(torch.utils.data.Dataset):
                         "cameltoe",
                         "cleft of venus",
                         "mount of venus",
+                        "photo",
+                        "guro",
+                        "R-18",
+                        "pus"+ "sy",
+                        "nip"+"ple",
+                        "pen"+"is",
+                        "an" +"us", # sexual tokens should not be dropped and always checked
+                        "real",
+                        "figma"
                     ] # this must not be dropped
                     len_tokens = len(tokens)
                     if len_tokens < 10:
@@ -984,7 +1020,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens) or any(t in token for t in strict_no_dropout_tokens):
                                 l.append(token)
-                        if len(l) <= 50:
+                        if len(l) <= 50 and sum(len(x) for x in l) < 25:
                             if random.random() < 0.25:
                                 l.append("very simple caption")
                     elif random.random() < 0.20:
@@ -993,7 +1029,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in no_dropout_tokens) or any(t in token for t in strict_no_dropout_tokens):
                                 l.append(token)
-                        if len(l) <= 50:
+                        if len(l) <= 50 and sum(len(x) for x in l) < 25:
                             if random.random() < 0.25:
                                 l.append("simple caption")
                     elif random.random() < 0.10:
@@ -1021,7 +1057,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     if len(l) > 10:
                         if random.random() < 0.5:
                             l += ["detailed caption"]
-                    if random.random() < 0.02:
+                    if random.random() < 0.42:
                         # add random alphanum (5~10 characters)
                         l.append(create_very_random_alphanumeric(random.randint(5, 10)))
                     # for tokens, randomly capitalize or uncapitalize first letter
@@ -1041,7 +1077,7 @@ class BaseDataset(torch.utils.data.Dataset):
                 # by random chance, use different join
                 if random.random() < 0.5:
                     caption = ", ".join(fixed_tokens + flex_tokens + fixed_suffix_tokens)
-                elif random.random() < 0.25:
+                elif random.random() < 0.05:
                     caption = " ".join(fixed_tokens + flex_tokens + fixed_suffix_tokens)
                 else:
                     caption = ",".join(fixed_tokens + flex_tokens + fixed_suffix_tokens)
@@ -4572,7 +4608,7 @@ def prepare_accelerator(args: argparse.Namespace):
                     "logging_dir is required when log_with is tensorboard / Tensorboardを使う場合、logging_dirを指定してください"
                 )
         if log_with in ["wandb", "all"]:
-            os.environ['WANDB__SERVICE_WAIT'] = '300'
+            os.environ['WANDB__SERVICE_WAIT'] = '1200'
             try:
                 import wandb
             except ImportError:
@@ -4581,7 +4617,7 @@ def prepare_accelerator(args: argparse.Namespace):
                 os.makedirs(logging_dir, exist_ok=True)
                 os.environ["WANDB_DIR"] = logging_dir
             if args.wandb_api_key is not None:
-                wandb.login(key=args.wandb_api_key, timeout=300)
+                wandb.login(key=args.wandb_api_key, timeout=1200)
 
     # torch.compile のオプション。 NO の場合は torch.compile は使わない
     dynamo_backend = "NO"
