@@ -157,7 +157,7 @@ CONVERTABLE_DICT = {
     "lineup" : ["lineup", "line up", "line-up", "group shot", "group photo"],
     "signature" : ["signature", "artist signature"],
     "profile" : ["profile", "side profile", "profile view", "side view", "from side"],
-    "multiple views" : ["multiple views", "various views", "multiple shots", "various shots", "different views", "diverse variations"],
+    "multiple views" : ["multiple views", "multiple shots"],
     "from above" : ["from above", "aerial view", "top view", "high angle"],
     "from below" : ["from below", "low angle", "from beneath", "from under"],
     "from behind" : ["from behind", "rear view", "from the back", "back view"],
@@ -172,7 +172,7 @@ CONVERTABLE_DICT = {
     "explicit" : ["explicit", "nsfw", "with nudity", "adult content", "explicit material"],
 }
 
-popular_chars_names = ["momiji", "character", "futo", "inaba", "yor", "seija", "stout", "sakuya", "yazawa", "tamamo", "ellen", "d'arc", "murasa", "misaka", "hearn", "kisaragi", "kaku", "ichinose", "hatate", "suwako", "douji", "aqua", "yoko", "samidare", "kikuchi", "nilou", "yuyuko", "sekibanki", "asashio", "rumia", "megurine", "kotori", "formidable", "frieren", "satori", "shijou", "kyrielight", "kanako", "remilia", "koakuma", "gardevoir", "littner", "princess", "d.va", "saber", "higuchi", "koishi", "bridget", "minami", "inkling", "monster", "kokomi", "miho", "kasodani", "houraisan", "kongou", "two", "artoria", "chen", "pyra", "patchouli", "konpaku", "tojo", "mercury", "shinobu", "tewi", "suika", "izumi", "shiroko", "inazuma", "kurodani", "akemi", "fujiwara", "mononobe", "kokoro", "nagae", "azusa", "youmu", "oma", "kafka", "c.c.", "arisu", "abigail", "mae", "yumemi", "manhattan", "mona", "shirakami", "zhongli", "ran", "shibuya", "kawashiro", "kaenbyou", "zero", "nakano", "yuudachi", "tao", "eula", "girl", "hoshimachi", "kasen", "raiden", "yuugi", "takane", "murakumo", "hoshii", "watanabe", "no", "rio", "minamoto", "kaname", "minato", "pendragon", "williams", "udongein", "shower", "super", "ryuuko", "himekaidou", "mirko", "cammy", "sayaka", "riamu", "reimu", "yasaka", "komeiji", "nightbug", "tachyon", "kokichi", "lumine", "utsuho", "rem", "tatsumaki", "shimamura", "sonoda", "takagaki", "shenhe", "kagerou", "miki", "houjuu", "lillie", "nagato", "senketsu", "amami", "player", "byakuren", "junko", "asuna", "kashima", "komachi", "kinomoto", "power", "kagamine", "kirisame", "kogasa", "sanae", "souji", "nico", "seiga", "mokou", "aran", "iono", "black", "usami", "nazrin", "akiyama", "kamisato", "joe", "miku", "nozomi", "shooter", "hu", "nahida", "luka", "mythra", "claudius", "kyoko", "yagokoro", "iku", "aya", "kaede", "takina", "morrigan", "amiya", "gokou", "yoshika", "suzuya", "dawn", "kamishirasawa", "shuten", "okita", "joseph", "reisalin", "ruri", "haruka", "nitori", "marnie", "plana", "renko", "shameimaru", "samus", "makoto", "holo", "doll", "yuuka", "hinanawi", "hatsune", "shiranui", "daiyousei", "kanzaki", "magician", "rembran", "reiuji", "jougasaki", "tohsaka", "maki", "ibuki", "karin", "kai", "white", "oshino", "koharu", "bowsette", "eiki", "toki", "ayaka", "cafe", "sagiri", "yelan", "zeppeli", "zelda", "wriggle", "hata", "ganaha", "saigyouji", "shimakaze", "mayuzumi", "shogun", "lorelei", "einzbern", "fuyuko", "knowledge", "sonico", "tifa", "rensouhou-chan", "rin", "kyouko", "kaguya", "serval", "nino", "ranko", "madoka", "flandre", "kisaki", "hong", "illyasviel", "koume", "hamakaze", "chun-li", "miko", "oyama", "shanghai", "joestar", "uzuki", "umi", "yui", "kaga", "tomoe", "mika", "mash", "ganyu", "ibaraki", "fubuki", "miorine", "dark", "ayanami", "arona", "2b", "boo", "eirin", "kazusa", "mio", "aensland", "anthonio", "von", "meiling", "parsee", "you", "tachibana", "warrior", "kitagawa", "fumika", "marine", "yamame", "alter", "marisa", "rikka", "megumin", "moriya", "sparkle", "nishizumi", "matoi", "takao", "raikou", "briar", "minamitsu", "rei", "imaizumi", "asuka", "kazami", "hk416", "shiki", "nero", "keine", "amatsukaze", "karyl", "hina", "chino", "mari", "nanami", "izayoi", "yae", "onozuka", "nishikigi", "nishikino", "yamato", "makima", "suigintou", "sagisawa", "rock", "mizuhashi", "yotsuba", "chiaki", "len", "margatroid", "ushio", "mikoto", "ayase", "mai", "hitori", "venti", "agnes", "scathach", "yoimiya", "gawr", "sagume", "ooyodo", "reisen", "chihaya", "haruhi", "gumi", "akagi", "souryuu", "hirasawa", "homura", "shigure", "hibiki", "yuzuki", "acheron", "link", "sakura", "ryuujou", "atago", "inubashiri", "mami", "nue", "yukari", "eugen", "jeanne", "gura", "firefly", "of", "hestia", "ni", "anchovy", "haruna", "aru", "houshou", "gotoh", "akatsuki", "kishin", "alice", "kijin", "hijiri", "kagiyama", "yakumo", "suisei", "ro-500", "keqing", "testarossa", "scarlet", "iowa", "suletta", "tenshi", "langley", "lockhart", "tatara", "mystia", "adachi", "rosa", "hoshiguma", "yuki", "hakurei", "furina", "light", "daiwa", "mahiro", "aris", "suzumiya", "kochiya", "inoue", "fate", "nami", "hunter", "tenryuu", "shirasaka", "astolfo", "caesar", "prinz", "marin", "toyosatomimi", "kafuu", "takarada", "hoshino", "clownpiece", "eli", "cynthia", "miyako", "darjeeling", "sangonomiya", "chisato", "rice", "ikazuchi", "cirno", "maribel"]
+popular_chars_names = ["momiji", "character", "futo", "inaba", "yor", "seija", "stout", "sakuya", "yazawa", "tamamo", "ellen", "d'arc", "murasa", "misaka", "hearn", "kisaragi", "kaku", "ichinose", "hatate", "suwako", "douji", "aqua", "yoko", "samidare", "kikuchi", "nilou", "yuyuko", "sekibanki", "asashio", "rumia", "megurine", "kotori", "formidable", "frieren", "satori", "shijou", "kyrielight", "kanako", "remilia", "koakuma", "gardevoir", "littner", "princess", "d.va", "saber", "higuchi", "koishi", "bridget", "minami", "inkling", "monster", "kokomi", "miho", "kasodani", "houraisan", "kongou", "artoria", "chen", "pyra", "patchouli", "konpaku", "tojo", "mercury", "shinobu", "tewi", "suika", "izumi", "shiroko", "inazuma", "kurodani", "akemi", "fujiwara", "mononobe", "kokoro", "nagae", "azusa", "youmu", "oma", "kafka", "c.c.", "arisu", "abigail", "mae", "yumemi", "manhattan", "mona", "shirakami", "zhongli", "shibuya", "kawashiro", "kaenbyou", "zero", "nakano", "yuudachi", "tao", "eula", "hoshimachi", "kasen", "raiden", "yuugi", "takane", "murakumo", "hoshii", "watanabe", "rio", "minamoto", "kaname", "minato", "pendragon", "williams", "udongein", "shower", "super", "ryuuko", "himekaidou", "mirko", "cammy", "sayaka", "riamu", "reimu", "yasaka", "komeiji", "nightbug", "tachyon", "kokichi", "lumine", "utsuho", "rem", "tatsumaki", "shimamura", "sonoda", "takagaki", "shenhe", "kagerou", "miki", "houjuu", "lillie", "nagato", "senketsu", "amami", "player", "byakuren", "junko", "asuna", "kashima", "komachi", "kinomoto", "power", "kagamine", "kirisame", "kogasa", "sanae", "souji", "nico", "seiga", "mokou", "aran", "iono", "usami", "nazrin", "akiyama", "kamisato", "joe", "miku", "nozomi", "shooter", "nahida", "luka", "mythra", "claudius", "kyoko", "yagokoro", "iku", "aya", "kaede", "takina", "morrigan", "amiya", "gokou", "yoshika", "suzuya", "dawn", "kamishirasawa", "shuten", "okita", "joseph", "reisalin", "ruri", "haruka", "nitori", "marnie", "plana", "renko", "shameimaru", "samus", "makoto", "holo", "doll", "yuuka", "hinanawi", "hatsune", "shiranui", "daiyousei", "kanzaki", "magician", "rembran", "reiuji", "jougasaki", "tohsaka", "maki", "ibuki", "karin", "kai", "white", "oshino", "koharu", "bowsette", "eiki", "toki", "ayaka", "cafe", "sagiri", "yelan", "zeppeli", "zelda", "wriggle", "hata", "ganaha", "saigyouji", "shimakaze", "mayuzumi", "shogun", "lorelei", "einzbern", "fuyuko", "knowledge", "sonico", "tifa", "rensouhou-chan", "rin", "kyouko", "kaguya", "serval", "nino", "ranko", "madoka", "flandre", "kisaki", "hong", "illyasviel", "koume", "hamakaze", "chun-li", "miko", "oyama", "shanghai", "joestar", "uzuki", "umi", "yui", "kaga", "tomoe", "mika", "mash", "ganyu", "ibaraki", "fubuki", "miorine", "dark", "ayanami", "arona", "2b", "boo", "eirin", "kazusa", "mio", "aensland", "anthonio", "von", "meiling", "parsee", "tachibana", "warrior", "kitagawa", "fumika", "marine", "yamame", "alter", "marisa", "rikka", "megumin", "moriya", "sparkle", "nishizumi", "matoi", "takao", "raikou", "briar", "minamitsu", "rei", "imaizumi", "asuka", "kazami", "hk416", "shiki", "nero", "keine", "amatsukaze", "karyl", "hina", "chino", "mari", "nanami", "izayoi", "yae", "onozuka", "nishikigi", "nishikino", "yamato", "makima", "suigintou", "sagisawa","mizuhashi", "yotsuba", "chiaki", "margatroid", "ushio", "mikoto", "ayase", "mai", "hitori", "venti", "agnes", "scathach", "yoimiya", "gawr", "sagume", "ooyodo", "reisen", "chihaya", "haruhi", "gumi", "akagi", "souryuu", "hirasawa", "homura", "shigure", "hibiki", "yuzuki", "acheron", "link", "sakura", "ryuujou", "atago", "inubashiri", "mami", "nue", "yukari", "eugen", "jeanne", "gura", "firefly", "hestia", "anchovy", "haruna", "aru", "houshou", "gotoh", "akatsuki", "kishin", "alice", "kijin", "hijiri", "kagiyama", "yakumo", "suisei", "ro-500", "keqing", "testarossa", "scarlet", "iowa", "suletta", "tenshi", "langley", "lockhart", "tatara", "mystia", "adachi", "rosa", "hoshiguma", "yuki", "hakurei", "furina", "daiwa", "mahiro", "aris", "suzumiya", "kochiya", "inoue", "fate", "nami", "hunter", "tenryuu", "shirasaka", "astolfo", "caesar", "prinz", "marin", "toyosatomimi", "kafuu", "takarada", "hoshino", "clownpiece", "cynthia", "miyako", "darjeeling", "sangonomiya", "chisato", "rice", "ikazuchi", "cirno", "maribel"]
 no_dropout_tokens = [
     # "low ",
     "lineart",
@@ -212,6 +212,7 @@ no_dropout_tokens = [
     "logo",
     "artist",
     "sign",
+    "username",
     "parody",
     "manga",
     "comic",
@@ -251,10 +252,13 @@ no_dropout_tokens = [
     "simple",
     "underwear",
     "panties",
-    "background",
+    "pubic",
+#    "background",
     "abstract",
     "monochrome", "single toned", "gradient with one color",
     "greyscale",
+    "various",
+    "koma",
     "ai-generated" # mark the image is generated by AI
 ] + [
     "pus"+ "sy",
@@ -993,14 +997,43 @@ class BaseDataset(torch.utils.data.Dataset):
                     strict_no_dropout_tokens = [
                         "explicit",
                         "questionable",
+                        "sensitive",
                         "nsfw",
                         "nudity",
                         "adult content",
-                        "cameltoe",
-                        "cleft of venus",
-                        "mount of venus",
                         "photo",
                         "guro",
+                        "koma",
+                        "panties",
+                        "underwear",
+                        "lo" + "li",
+                        "sho" + "ta",
+                        "anime",
+                        "comic",
+                        "manga",
+                        "multiple",
+                        "chart",
+                        "collage",
+                        "diagram",
+                        "sheet",
+                        "lineup",
+                        "panels",
+                        "graph",
+                        "turnaround",
+                        "variation",
+                        "expression",
+                        "logo",
+                        "username",
+                        "text",
+                        "copyright",
+                        "artifact",
+                        "family tree",
+                        "bad ",
+                        "sign",
+                        "pubic",
+                        "scat",
+                        "nude",
+                        "naked",
                         "R-18",
                         "pus"+ "sy",
                         "nip"+"ple",
@@ -1023,7 +1056,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         if len(l) <= 50 and sum(len(x) for x in l) < 25:
                             if random.random() < 0.25:
                                 l.append("very simple caption")
-                    elif random.random() < 0.20:
+                    elif random.random() < 0.30:
                         target_tokens = max(15, int(len_tokens * 0.4))
                         selected_token_indices = random.sample(range(len_tokens), min(target_tokens, len_tokens))
                         for i, token in enumerate(tokens):
@@ -1032,7 +1065,7 @@ class BaseDataset(torch.utils.data.Dataset):
                         if len(l) <= 50 and sum(len(x) for x in l) < 25:
                             if random.random() < 0.25:
                                 l.append("simple caption")
-                    elif random.random() < 0.10:
+                    elif random.random() < 0.20:
                         # use only max 6 tokens
                         target_tokens = min(6, len_tokens)
                         selected_token_indices = random.sample(range(len_tokens), target_tokens)
@@ -1041,7 +1074,7 @@ class BaseDataset(torch.utils.data.Dataset):
                                 l.append(token)
                         if random.random() < 0.25:
                             l.append("extremely simple caption")
-                    elif random.random() < 0.04:
+                    elif random.random() < 0.14:
                         # use only max 1-5 tokens
                         target_tokens = min(len_tokens, random.randint(1, 5))
                         selected_token_indices = random.sample(range(len_tokens), target_tokens)
@@ -1057,7 +1090,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     if len(l) > 10:
                         if random.random() < 0.5:
                             l += ["detailed caption"]
-                    if random.random() < 0.42:
+                    if random.random() < 0.03:
                         # add random alphanum (5~10 characters)
                         l.append(create_very_random_alphanumeric(random.randint(5, 10)))
                     # for tokens, randomly capitalize or uncapitalize first letter
@@ -1067,6 +1100,12 @@ class BaseDataset(torch.utils.data.Dataset):
                                 l[i] = token.capitalize()
                             else:
                                 l[i] = token.lower()
+                        if "-" in token:
+                            if random.random() < 0.5:
+                                l[i] = token.replace("-", " ")
+                        if "_" in token:
+                            if random.random() < 0.5:
+                                l[i] = token.replace("_", " ")
                     return l
 
                 #if subset.shuffle_caption:
