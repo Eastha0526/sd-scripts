@@ -156,7 +156,6 @@ def train(args):
                 user_config = {
                     "datasets": [
                         {
-                            "multi_captions" : args.multi_captions,
                             "subsets": [
                                 {
                                     "image_dir": args.train_data_dir,
@@ -201,6 +200,10 @@ def train(args):
     # acceleratorを準備する
     logger.info("prepare accelerator")
     accelerator = train_util.prepare_accelerator(args)
+    logger.info(f"Accelerator prepared at {accelerator.device} / process index : {accelerator.num_processes}, local process index : {accelerator.local_process_index}")
+    logger.info(f"Waiting for everyone / 他のプロセスを待機中")
+    accelerator.wait_for_everyone()
+    logger.info("All processes are ready / すべてのプロセスが準備完了")
 
     # mixed precisionに対応した型を用意しておき適宜castする
     weight_dtype, save_dtype = train_util.prepare_dtype(args)
@@ -366,7 +369,7 @@ def train(args):
         batch_size=1,
         shuffle=True,
         collate_fn=collator,
-        num_workers=n_workers, # To avoid RuntimeError: DataLoader worker exited unexpectedly with exit code 1.
+        num_workers=n_workers,
         persistent_workers=args.persistent_data_loader_workers,
     )
 
@@ -590,8 +593,10 @@ def train(args):
                 # Predict the noise residual
                 with accelerator.autocast():
                     noise_pred = unet(noisy_latents, timesteps, text_embedding, vector_embedding)
-
-                target = noise
+                if args.v_parameterization:
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                else:
+                    target = noise
 
                 if (
                     args.min_snr_gamma
@@ -607,7 +612,7 @@ def train(args):
                     loss = loss.mean([1, 2, 3])
 
                     if args.min_snr_gamma:
-                        loss = apply_snr_weight(loss, timesteps, noise_scheduler, args.min_snr_gamma)
+                        loss = apply_snr_weight(loss, timesteps, noise_scheduler, args.min_snr_gamma, args.v_parameterization)
                     if args.scale_v_pred_loss_like_noise_pred:
                         loss = scale_v_prediction_loss_like_noise_prediction(loss, timesteps, noise_scheduler)
                     if args.v_pred_like_loss:
@@ -772,6 +777,7 @@ def setup_parser() -> argparse.ArgumentParser:
     train_util.add_masked_loss_arguments(parser)
     deepspeed_utils.add_deepspeed_arguments(parser)
     train_util.add_sd_saving_arguments(parser)
+    #train_util.add_skip_check_arguments(parser)
     train_util.add_optimizer_arguments(parser)
     config_util.add_config_arguments(parser)
     custom_train_functions.add_custom_train_arguments(parser)
@@ -815,5 +821,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     train_util.verify_command_line_training_args(args)
     args = train_util.read_config_from_file(args, parser)
-
+    # if args.skip_file_existence_check:
+    #     train_util.set_skip_path_check(True)
     train(args)
