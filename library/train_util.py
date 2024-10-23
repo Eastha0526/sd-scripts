@@ -186,6 +186,7 @@ no_dropout_tokens = [
     "sketch",
     "amateur",
     "displeasing",
+    "jaggy",
     #"close up",
     #"close-up",
     "cropped",
@@ -253,6 +254,7 @@ no_dropout_tokens = [
     "underwear",
     "panties",
     "pubic",
+    "topless",
 #    "background",
     "abstract",
     "monochrome", "single toned", "gradient with one color",
@@ -319,7 +321,7 @@ def create_very_random_alphanumeric(length):
     return "".join(random.choices("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=length))
 
 class ImageInfo:
-    def __init__(self, image_key: str, num_repeats: int, caption: str, is_reg: bool, absolute_path: str, subset_idx: int) -> None:
+    def __init__(self, image_key: str, num_repeats: int, caption: str, is_reg: bool, absolute_path: str, subset_idx: int=0) -> None:
         self.image_key: str = image_key + "_" + str(subset_idx)
         self.num_repeats: int = num_repeats
         self.caption: str = caption
@@ -1031,10 +1033,14 @@ class BaseDataset(torch.utils.data.Dataset):
                         "bad ",
                         "sign",
                         "pubic",
+                        "jaggy",
+                        "topless",
+                        "bottomless",
+                        "twitter",
                         "scat",
                         "nude",
                         "naked",
-                        "R-18",
+                        "r-18",
                         "pus"+ "sy",
                         "nip"+"ple",
                         "pen"+"is",
@@ -5294,11 +5300,18 @@ def get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents):
     # Add noise to the latents according to the noise magnitude at each timestep
     # (this is the forward diffusion process)
     if args.ip_noise_gamma:
+        # Compute SNR for each timestep
+        snr_t = torch.stack([noise_scheduler.all_snr[t] for t in timesteps])  # batch_size
+        snr_t = torch.minimum(snr_t, torch.ones_like(snr_t) * 1000)  # limit SNR to avoid infinities
         if args.ip_noise_gamma_random_strength:
-            strength = torch.rand(1, device=latents.device) * args.ip_noise_gamma
+            gamma = torch.rand(1, device=latents.device) * args.ip_noise_gamma
         else:
-            strength = args.ip_noise_gamma
-        noisy_latents = noise_scheduler.add_noise(latents, noise + strength * torch.randn_like(latents), timesteps)
+            gamma = args.ip_noise_gamma
+        # Scale the added noise based on SNR
+        scaling = gamma * snr_t / (snr_t + 1)
+        scaling = scaling.view(-1, *[1] * (len(latents.shape) - 1))  # Reshape to match latents
+        added_noise = scaling * torch.randn_like(latents)
+        noisy_latents = noise_scheduler.add_noise(latents, noise + added_noise, timesteps)
     else:
         noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
@@ -5537,7 +5550,12 @@ def sample_images_common(
         sample_sampler=args.sample_sampler,
         v_parameterization=args.v_parameterization,
     )
-
+    # if args.v_parameterization:
+    #     print(f"Using v-parameterization / vパラメータ化を使用します")
+    #     default_scheduler.register_to_config(
+    #         prediction_type="v_prediction",
+    #         rescale_betas_zero_snr=True
+    #     )
     pipeline = pipe_class(
         text_encoder=text_encoder,
         vae=vae,
@@ -5549,6 +5567,7 @@ def sample_images_common(
         requires_safety_checker=False,
         clip_skip=args.clip_skip,
     )
+    
     pipeline.to(distributed_state.device)
     save_dir = args.output_dir + "/sample"
     os.makedirs(save_dir, exist_ok=True)
@@ -5727,8 +5746,8 @@ def sample_image_inference(
     num_suffix = f"e{epoch:06d}" if epoch is not None else f"{steps:06d}"
     seed_suffix = "" if seed is None else f"_{seed}"
     i: int = prompt_dict["enum"]
-    img_filename = f"{'' if args.output_name is None else args.output_name + '_'}{num_suffix}_{i:02d}_{ts_str}{seed_suffix}.png"
-    image.save(os.path.join(save_dir, img_filename))
+    img_filename = f"{'' if args.output_name is None else args.output_name + '_'}{num_suffix}_{i:02d}_{ts_str}{seed_suffix}.webp"
+    image.save(os.path.join(save_dir, img_filename), "WEBP", quality=100, optimize=True)
     return os.path.join(save_dir, img_filename)
 
 
