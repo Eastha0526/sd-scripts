@@ -121,9 +121,6 @@ def train(args):
     cache_latents = args.cache_latents
     use_dreambooth_method = args.in_json is None
 
-    if args.seed is not None:
-        set_seed(args.seed)  # 乱数系列を初期化する
-
     tokenizer1, tokenizer2 = sdxl_train_util.load_tokenizers(args)
 
     # データセットを準備する
@@ -204,7 +201,8 @@ def train(args):
     logger.info(f"Waiting for everyone / 他のプロセスを待機中")
     accelerator.wait_for_everyone()
     logger.info("All processes are ready / すべてのプロセスが準備完了")
-
+    if args.seed is not None:
+        set_seed(args.seed + accelerator.local_process_index)
     # mixed precisionに対応した型を用意しておき適宜castする
     weight_dtype, save_dtype = train_util.prepare_dtype(args)
     vae_dtype = torch.float32 if args.no_half_vae else weight_dtype
@@ -618,7 +616,7 @@ def train(args):
                     if args.v_pred_like_loss:
                         loss = add_v_prediction_like_loss(loss, timesteps, noise_scheduler, args.v_pred_like_loss)
                     if args.debiased_estimation_loss:
-                        loss = apply_debiased_estimation(loss, timesteps, noise_scheduler)
+                        loss = apply_debiased_estimation(loss, timesteps, noise_scheduler, args.v_parameterization)
 
                     loss = loss.mean()  # mean over batch dimension
                 else:
