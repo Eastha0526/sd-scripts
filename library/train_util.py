@@ -29,8 +29,11 @@ import hashlib
 import subprocess
 from io import BytesIO
 import toml
-
+import base64
 from tqdm import tqdm
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.fernet import Fernet
 
 import torch
 from library.device_utils import init_ipex, clean_memory_on_device
@@ -172,7 +175,7 @@ CONVERTABLE_DICT = {
     "explicit" : ["explicit", "nsfw", "with nudity", "adult content", "explicit material"],
 }
 
-popular_chars_names = ["momiji", "character", "futo", "inaba", "yor", "seija", "stout", "sakuya", "yazawa", "tamamo", "ellen", "d'arc", "murasa", "misaka", "hearn", "kisaragi", "kaku", "ichinose", "hatate", "suwako", "douji", "aqua", "yoko", "samidare", "kikuchi", "nilou", "yuyuko", "sekibanki", "asashio", "rumia", "megurine", "kotori", "formidable", "frieren", "satori", "shijou", "kyrielight", "kanako", "remilia", "koakuma", "gardevoir", "littner", "princess", "d.va", "saber", "higuchi", "koishi", "bridget", "minami", "inkling", "monster", "kokomi", "miho", "kasodani", "houraisan", "kongou", "artoria", "chen", "pyra", "patchouli", "konpaku", "tojo", "mercury", "shinobu", "tewi", "suika", "izumi", "shiroko", "inazuma", "kurodani", "akemi", "fujiwara", "mononobe", "kokoro", "nagae", "azusa", "youmu", "oma", "kafka", "c.c.", "arisu", "abigail", "mae", "yumemi", "manhattan", "mona", "shirakami", "zhongli", "shibuya", "kawashiro", "kaenbyou", "zero", "nakano", "yuudachi", "tao", "eula", "hoshimachi", "kasen", "raiden", "yuugi", "takane", "murakumo", "hoshii", "watanabe", "rio", "minamoto", "kaname", "minato", "pendragon", "williams", "udongein", "shower", "super", "ryuuko", "himekaidou", "mirko", "cammy", "sayaka", "riamu", "reimu", "yasaka", "komeiji", "nightbug", "tachyon", "kokichi", "lumine", "utsuho", "rem", "tatsumaki", "shimamura", "sonoda", "takagaki", "shenhe", "kagerou", "miki", "houjuu", "lillie", "nagato", "senketsu", "amami", "player", "byakuren", "junko", "asuna", "kashima", "komachi", "kinomoto", "power", "kagamine", "kirisame", "kogasa", "sanae", "souji", "nico", "seiga", "mokou", "aran", "iono", "usami", "nazrin", "akiyama", "kamisato", "joe", "miku", "nozomi", "shooter", "nahida", "luka", "mythra", "claudius", "kyoko", "yagokoro", "iku", "aya", "kaede", "takina", "morrigan", "amiya", "gokou", "yoshika", "suzuya", "dawn", "kamishirasawa", "shuten", "okita", "joseph", "reisalin", "ruri", "haruka", "nitori", "marnie", "plana", "renko", "shameimaru", "samus", "makoto", "holo", "doll", "yuuka", "hinanawi", "hatsune", "shiranui", "daiyousei", "kanzaki", "magician", "rembran", "reiuji", "jougasaki", "tohsaka", "maki", "ibuki", "karin", "kai", "white", "oshino", "koharu", "bowsette", "eiki", "toki", "ayaka", "cafe", "sagiri", "yelan", "zeppeli", "zelda", "wriggle", "hata", "ganaha", "saigyouji", "shimakaze", "mayuzumi", "shogun", "lorelei", "einzbern", "fuyuko", "knowledge", "sonico", "tifa", "rensouhou-chan", "rin", "kyouko", "kaguya", "serval", "nino", "ranko", "madoka", "flandre", "kisaki", "hong", "illyasviel", "koume", "hamakaze", "chun-li", "miko", "oyama", "shanghai", "joestar", "uzuki", "umi", "yui", "kaga", "tomoe", "mika", "mash", "ganyu", "ibaraki", "fubuki", "miorine", "dark", "ayanami", "arona", "2b", "boo", "eirin", "kazusa", "mio", "aensland", "anthonio", "von", "meiling", "parsee", "tachibana", "warrior", "kitagawa", "fumika", "marine", "yamame", "alter", "marisa", "rikka", "megumin", "moriya", "sparkle", "nishizumi", "matoi", "takao", "raikou", "briar", "minamitsu", "rei", "imaizumi", "asuka", "kazami", "hk416", "shiki", "nero", "keine", "amatsukaze", "karyl", "hina", "chino", "mari", "nanami", "izayoi", "yae", "onozuka", "nishikigi", "nishikino", "yamato", "makima", "suigintou", "sagisawa","mizuhashi", "yotsuba", "chiaki", "margatroid", "ushio", "mikoto", "ayase", "mai", "hitori", "venti", "agnes", "scathach", "yoimiya", "gawr", "sagume", "ooyodo", "reisen", "chihaya", "haruhi", "gumi", "akagi", "souryuu", "hirasawa", "homura", "shigure", "hibiki", "yuzuki", "acheron", "link", "sakura", "ryuujou", "atago", "inubashiri", "mami", "nue", "yukari", "eugen", "jeanne", "gura", "firefly", "hestia", "anchovy", "haruna", "aru", "houshou", "gotoh", "akatsuki", "kishin", "alice", "kijin", "hijiri", "kagiyama", "yakumo", "suisei", "ro-500", "keqing", "testarossa", "scarlet", "iowa", "suletta", "tenshi", "langley", "lockhart", "tatara", "mystia", "adachi", "rosa", "hoshiguma", "yuki", "hakurei", "furina", "daiwa", "mahiro", "aris", "suzumiya", "kochiya", "inoue", "fate", "nami", "hunter", "tenryuu", "shirasaka", "astolfo", "caesar", "prinz", "marin", "toyosatomimi", "kafuu", "takarada", "hoshino", "clownpiece", "cynthia", "miyako", "darjeeling", "sangonomiya", "chisato", "rice", "ikazuchi", "cirno", "maribel"]
+popular_chars_names = ["momiji", "character", "futo", "inaba", "yor", "seija", "stout", "sakuya", "yazawa", "tamamo", "ellen", "d'arc", "murasa", "misaka", "hearn", "kisaragi", "kaku", "ichinose", "hatate", "suwako", "douji", "aqua", "yoko", "samidare", "kikuchi", "nilou", "yuyuko", "sekibanki", "asashio", "rumia", "megurine", "kotori", "formidable", "frieren", "satori", "shijou", "kyrielight", "kanako", "remilia", "koakuma", "gardevoir", "littner", "princess", "d.va", "saber", "higuchi", "koishi", "bridget", "minami", "inkling", "monster", "kokomi", "miho", "kasodani", "houraisan", "kongou", "artoria", "chen", "pyra", "patchouli", "konpaku", "tojo", "mercury", "shinobu", "tewi", "suika", "izumi", "shiroko", "inazuma", "kurodani", "akemi", "fujiwara", "mononobe", "kokoro", "nagae", "azusa", "youmu", "oma", "kafka", "c.c.", "arisu", "abigail", "mae", "yumemi", "manhattan", "mona", "shirakami", "zhongli", "shibuya", "kawashiro", "kaenbyou", "zero", "nakano", "yuudachi", "tao", "eula", "hoshimachi", "kasen", "raiden", "yuugi", "takane", "murakumo", "hoshii", "watanabe", "rio", "minamoto", "kaname", "minato", "pendragon", "williams", "udongein", "shower", "super", "ryuuko", "himekaidou", "mirko", "cammy", "sayaka", "riamu", "reimu", "yasaka", "komeiji", "nightbug", "tachyon", "kokichi", "lumine", "utsuho", "rem", "tatsumaki", "shimamura", "sonoda", "takagaki", "shenhe", "kagerou", "miki", "houjuu", "lillie", "nagato", "senketsu", "amami", "player", "byakuren", "junko", "asuna", "kashima", "komachi", "kinomoto", "power", "kagamine", "kirisame", "kogasa", "sanae", "souji", "nico", "seiga", "mokou", "aran", "iono", "usami", "nazrin", "akiyama", "kamisato", "joe", "miku", "nozomi", "shooter", "nahida", "luka", "mythra", "claudius", "kyoko", "yagokoro", "iku", "aya", "kaede", "takina", "morrigan", "amiya", "gokou", "yoshika", "suzuya", "dawn", "kamishirasawa", "shuten", "okita", "joseph", "reisalin", "ruri", "haruka", "nitori", "marnie", "plana", "renko", "shameimaru", "samus", "makoto", "holo", "doll", "yuuka", "hinanawi", "hatsune", "shiranui", "daiyousei", "kanzaki", "magician", "rembran", "reiuji", "jougasaki", "tohsaka", "maki", "ibuki", "karin", "kai", "white", "oshino", "koharu", "bowsette", "eiki", "toki", "ayaka", "cafe", "sagiri", "yelan", "zeppeli", "zelda", "wriggle", "hata", "ganaha", "saigyouji", "shimakaze", "mayuzumi", "shogun", "lorelei", "einzbern", "fuyuko", "knowledge", "sonico", "tifa", "rensouhou-chan", "rin", "kyouko", "kaguya", "serval", "nino", "ranko", "madoka", "flandre", "kisaki", "hong", "illyasviel", "koume", "hamakaze", "chun-li", "miko", "oyama", "shanghai", "joestar", "uzuki", "umi", "yui", "kaga", "tomoe", "mika", "mash", "ganyu", "ibaraki", "fubuki", "miorine", "dark", "ayanami", "arona", "2b", "boo", "eirin", "kazusa", "mio", "aensland", "anthonio", "von", "meiling", "parsee", "tachibana", "warrior", "kitagawa", "fumika", "marine", "yamame", "alter", "marisa", "rikka", "megumin", "moriya", "sparkle", "nishizumi", "matoi", "takao", "raikou", "briar", "minamitsu", "rei", "imaizumi", "asuka", "kazami", "hk416", "shiki", "nero", "keine", "amatsukaze", "karyl", "hina", "chino", "mari", "nanami", "izayoi", "yae", "onozuka", "nishikigi", "nishikino", "yamato", "makima", "suigintou", "sagisawa","mizuhashi", "yotsuba", "chiaki", "margatroid", "ushio", "mikoto", "ayase", "mai", "hitori", "venti", "agnes", "scathach", "yoimiya", "gawr", "sagume", "ooyodo", "reisen", "chihaya", "haruhi", "gumi", "akagi", "souryuu", "hirasawa", "homura", "shigure", "hibiki", "yuzuki", "acheron", "link", "sakura", "ryuujou", "atago", "inubashiri", "mami", "nue", "yukari", "eugen", "jeanne", "gura", "firefly", "hestia", "anchovy", "haruna", "aru", "houshou", "gotoh", "akatsuki", "kishin", "alice", "kijin", "hijiri", "kagiyama", "yakumo", "suisei", "ro-500", "keqing", "testarossa", "scarlet", "iowa", "suletta", "tenshi", "langley", "lockhart", "tatara", "mystia", "adachi", "rosa", "hoshiguma", "yuki", "hakurei", "furina", "daiwa", "mahiro", "aris", "suzumiya", "kochiya", "inoue", "fate", "nami", "hunter", "tenryuu", "shirasaka", "astolfo", "caesar", "prinz", "marin", "toyosatomimi", "kafuu", "takarada", "hoshino", "clownpiece", "cynthia", "miyako", "darjeeling", "sangonomiya", "chisato", "rice", "ikazuchi", "cirno", "maribel", "mizumiya", "niko", "kikirara", "riona"]
 no_dropout_tokens = [
     # "low ",
     "lineart",
@@ -230,6 +233,7 @@ no_dropout_tokens = [
     "extra digits",
     "bad reflection",
     "artistic",
+    "halo", # blue archive please
     "poorly drawn",
     #"chromatic",
     "chiaroscuro",
@@ -366,6 +370,38 @@ class MultiCaptionImageInfo(ImageInfo):
         super().__init__(image_key, num_repeats, captions[0], is_reg, absolute_path)
         self.captions: List[str] = captions
         self.supports_multiple_caption = True
+import orjson  # Make sure to install orjson via: pip install orjson
+
+def decrypt_json_file(encrypted_file, password):
+    password_bytes = password.encode('utf-8')  # Convert password to bytes
+
+    # Read the encrypted file
+    with open(encrypted_file, 'rb') as f:
+        salt = f.read(16)  # Extract the salt (first 16 bytes)
+        encrypted_data = f.read()
+
+    # Derive the key using the same salt and password
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100_000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(password_bytes))
+    fernet = Fernet(key)
+
+    # Decrypt the data
+    try:
+        decrypted_data = fernet.decrypt(encrypted_data)
+    except Exception as e:
+        print("Incorrect password or corrupted file.")
+        return None
+
+    # Parse the JSON data directly from bytes using orjson
+    json_data = orjson.loads(decrypted_data)
+
+    # Return the JSON data
+    return json_data
 
 class BucketManager:
     def __init__(self, no_upscale, max_reso, min_size, max_size, reso_steps) -> None:
@@ -989,8 +1025,8 @@ class BaseDataset(torch.utils.data.Dataset):
 
                 def dropout_tags(tokens):
                     # drop until token length gets smaller than 225 (hardcoded here)
-                    if len(tokens) > 300:
-                        while len(tokens) > 300:
+                    if len(tokens) > 225:
+                        while len(tokens) > 225:
                             tokens.pop(random.randint(0, len(tokens) - 1))
                     if subset.caption_tag_dropout_rate <= 0 or not subset.shuffle_caption:
                         return tokens
@@ -1082,7 +1118,7 @@ class BaseDataset(torch.utils.data.Dataset):
                             l.append("extremely simple caption")
                     elif random.random() < 0.14:
                         # use only max 1-5 tokens
-                        target_tokens = min(len_tokens, random.randint(1, 5))
+                        target_tokens = min(len_tokens, random.randint(0, 5))
                         selected_token_indices = random.sample(range(len_tokens), target_tokens)
                         for i, token in enumerate(tokens):
                             if i in selected_token_indices or any(t in token for t in strict_no_dropout_tokens):
@@ -2037,8 +2073,11 @@ class FineTuningDataset(BaseDataset):
             # メタデータを読み込む
             if os.path.exists(subset.metadata_file):
                 logger.info(f"loading existing metadata: {subset.metadata_file}")
-                with open(subset.metadata_file, "rt", encoding="utf-8") as f:
-                    metadata = json.load(f)
+                if subset.metadata_file.endswith("_enc.json"):
+                    metadata = decrypt_json_file(subset.metadata_file, "passwd")
+                else:
+                    with open(subset.metadata_file, "rt", encoding="utf-8") as f:
+                        metadata = json.load(f)
             else:
                 raise ValueError(f"no metadata / メタデータファイルがありません: {subset.metadata_file}")
 
@@ -3602,6 +3641,12 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
         help="fix noise scheduler betas to enforce zero terminal SNR / noise schedulerのbetasを修正して、zero terminal SNRを強制する",
     )
     parser.add_argument(
+        "--terminal_snr_value",
+        type=float,
+        help="Use this value for zero / modified terminal SNR (default is 0), 0.1 = original, so set it smaller / 終端SNRにこの値を使用する（デフォルトは0）",
+        default=0
+    )
+    parser.add_argument(
         "--min_timestep",
         type=int,
         default=None,
@@ -5072,8 +5117,12 @@ def save_sd_model_on_epoch_end_or_stepwise_common(
         ckpt_file = os.path.join(args.output_dir, ckpt_name)
         logger.info("")
         logger.info(f"saving checkpoint: {ckpt_file}")
-        sd_saver(ckpt_file, epoch_no, global_step)
-
+        try:
+            sd_saver(ckpt_file, epoch_no, global_step)
+        except Exception as ex:
+            logger.error(f"failed to save checkpoint: {ckpt_file}")
+            logger.error(ex)
+            return
         if args.huggingface_repo_id is not None:
             huggingface_util.upload(args, ckpt_file, "/" + ckpt_name)
 
@@ -5111,7 +5160,11 @@ def save_sd_model_on_epoch_end_or_stepwise_common(
 
             if os.path.exists(remove_out_dir):
                 logger.info(f"removing old model: {remove_out_dir}")
-                shutil.rmtree(remove_out_dir)
+                try:
+                    shutil.rmtree(remove_out_dir)
+                except Exception as ex:
+                    logger.error(f"failed to remove old model: {remove_out_dir}")
+                    logger.error(ex)
 
     if args.save_state:
         if on_epoch_end:
@@ -5139,7 +5192,11 @@ def save_and_remove_state_on_epoch_end(args: argparse.Namespace, accelerator, ep
         state_dir_old = os.path.join(args.output_dir, EPOCH_STATE_NAME.format(model_name, remove_epoch_no))
         if os.path.exists(state_dir_old):
             logger.info(f"removing old state: {state_dir_old}")
-            shutil.rmtree(state_dir_old)
+            try:
+                shutil.rmtree(state_dir_old)
+            except Exception as ex:
+                logger.error(f"failed to remove old state: {state_dir_old}")
+                logger.error(ex)
 
 
 def save_and_remove_state_stepwise(args: argparse.Namespace, accelerator, step_no):
@@ -5164,8 +5221,12 @@ def save_and_remove_state_stepwise(args: argparse.Namespace, accelerator, step_n
         if remove_step_no > 0:
             state_dir_old = os.path.join(args.output_dir, STEP_STATE_NAME.format(model_name, remove_step_no))
             if os.path.exists(state_dir_old):
-                logger.info(f"removing old state: {state_dir_old}")
-                shutil.rmtree(state_dir_old)
+                try:
+                    logger.info(f"removing old state: {state_dir_old}")
+                    shutil.rmtree(state_dir_old)
+                except Exception as ex:
+                    logger.error(f"failed to remove old state: {state_dir_old}")
+                    logger.error(ex)
 
 
 def save_state_on_train_end(args: argparse.Namespace, accelerator):
@@ -5300,17 +5361,11 @@ def get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents):
     # Add noise to the latents according to the noise magnitude at each timestep
     # (this is the forward diffusion process)
     if args.ip_noise_gamma:
-        # Compute SNR for each timestep
-        snr_t = torch.stack([noise_scheduler.all_snr[t] for t in timesteps])  # batch_size
-        snr_t = torch.minimum(snr_t, torch.ones_like(snr_t) * 1000)  # limit SNR to avoid infinities
         if args.ip_noise_gamma_random_strength:
             gamma = torch.rand(1, device=latents.device) * args.ip_noise_gamma
         else:
             gamma = args.ip_noise_gamma
-        # Scale the added noise based on SNR
-        scaling = gamma * snr_t / (snr_t + 1)
-        scaling = scaling.view(-1, *[1] * (len(latents.shape) - 1))  # Reshape to match latents
-        added_noise = scaling * torch.randn_like(latents)
+        added_noise = gamma * torch.randn_like(latents)
         noisy_latents = noise_scheduler.add_noise(latents, noise + added_noise, timesteps)
     else:
         noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
@@ -5388,6 +5443,8 @@ def get_my_scheduler(
         scheduler_cls = LMSDiscreteScheduler
     elif sample_sampler == "euler" or sample_sampler == "k_euler":
         scheduler_cls = EulerDiscreteScheduler
+        sched_init_args["use_karras_sigmas"] = True
+        sched_init_args["sigma_max"] = 29.0
     elif sample_sampler == "euler_a" or sample_sampler == "k_euler_a":
         scheduler_cls = EulerAncestralDiscreteScheduler
     elif sample_sampler == "dpmsolver" or sample_sampler == "dpmsolver++":
