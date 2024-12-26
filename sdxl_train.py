@@ -12,7 +12,7 @@ from tqdm import tqdm
 import torch
 from library.device_utils import init_ipex, clean_memory_on_device
 
-
+import random
 init_ipex()
 
 from accelerate.utils import set_seed
@@ -476,12 +476,17 @@ def train(args):
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0, disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
 
-    noise_scheduler = DDPMScheduler(
+    noise_scheduler_orig = DDPMScheduler(
         beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000, clip_sample=False
     )
-    prepare_scheduler_for_custom_training(noise_scheduler, accelerator.device)
+    noise_scheduler_non_ztsnr = DDPMScheduler(
+        beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000, clip_sample=False
+    )
     if args.zero_terminal_snr:
-        custom_train_functions.fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler)
+        custom_train_functions.fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler_orig, args.terminal_snr_value)
+    prepare_scheduler_for_custom_training(noise_scheduler_orig, accelerator.device)
+    prepare_scheduler_for_custom_training(noise_scheduler_non_ztsnr, accelerator.device)
+
 
     if accelerator.is_main_process:
         init_kwargs = {}
@@ -581,7 +586,11 @@ def train(args):
                 # concat embeddings
                 vector_embedding = torch.cat([pool2, embs], dim=1).to(weight_dtype)
                 text_embedding = torch.cat([encoder_hidden_states1, encoder_hidden_states2], dim=2).to(weight_dtype)
-
+                
+                if random.random() < args.ztsnr_rate: # use non-zero terminal snr for 5% of the steps which will help to stabilize training
+                    noise_scheduler = noise_scheduler_non_ztsnr
+                else:
+                    noise_scheduler = noise_scheduler_orig
                 # Sample noise, sample a random timestep for each image, and add noise to the latents,
                 # with noise offset and/or multires noise if specified
                 noise, noisy_latents, timesteps, huber_c = train_util.get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents)
@@ -786,6 +795,11 @@ def setup_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="learning rate for text encoder 1 (ViT-L) / text encoder 1 (ViT-L)の学習率",
+    )
+    parser.add_argument(
+        "--ztsnr_rate",
+        type=float,
+        default=0.025,
     )
     parser.add_argument(
         "--learning_rate_te2",
