@@ -21,11 +21,12 @@ def prepare_scheduler_for_custom_training(noise_scheduler, device):
     alpha = sqrt_alphas_cumprod
     sigma = sqrt_one_minus_alphas_cumprod
     all_snr = (alpha / sigma) ** 2
-
+    # check if any value of all_snr > 20000
+    logger.info(f"all_snr: {all_snr}")
     noise_scheduler.all_snr = all_snr.to(device)
 
 
-def fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler):
+def fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler, target_value=0):
     # fix beta: zero terminal SNR
     logger.info(f"fix noise scheduler betas: https://arxiv.org/abs/2305.08891")
 
@@ -49,9 +50,44 @@ def fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler):
         alphas = torch.cat([alphas_bar[0:1], alphas])
         betas = 1 - alphas
         return betas
+    def fix_noise_scheduler_betas_for_desired_terminal_snr(betas, desired_terminal_snr):
+        """Use pruned-betas to enforce a desired terminal SNR."""
+        assert desired_terminal_snr < 0.01, "desired_terminal_snr must be less than 0.01(approx) which is original target SNR, are you sure?"
+        # if given input is not torch.tensor, convert it to torch.tensor
+        if not isinstance(desired_terminal_snr, torch.Tensor):
+            desired_terminal_snr = torch.tensor(desired_terminal_snr) # convert to tensor
+        # Convert betas to alphas_bar_sqrt
+        alphas = 1 - betas
+        alphas_bar = alphas.cumprod(0)
+        alphas_bar_sqrt = alphas_bar.sqrt()
+
+        # Store old values
+        alphas_bar_sqrt_0 = alphas_bar_sqrt[0].clone()
+        alphas_bar_sqrt_T = alphas_bar_sqrt[-1].clone()
+
+        # Compute desired alphas_bar_T based on desired_terminal_snr
+        desired_alphas_bar_T = desired_terminal_snr / (1 + desired_terminal_snr)
+        desired_alphas_bar_sqrt_T = desired_alphas_bar_T.sqrt()
+
+        # Shift so last timestep is desired_alphas_bar_sqrt_T
+        shift = alphas_bar_sqrt_T - desired_alphas_bar_sqrt_T
+        alphas_bar_sqrt -= shift
+
+        # Scale so first timestep is back to old value
+        scale = alphas_bar_sqrt_0 / (alphas_bar_sqrt_0 - shift)
+        alphas_bar_sqrt *= scale
+
+        # Convert alphas_bar_sqrt to betas
+        alphas_bar = alphas_bar_sqrt**2
+        alphas = alphas_bar[1:] / alphas_bar[:-1]
+        alphas = torch.cat([alphas_bar[0:1], alphas])
+        betas = 1 - alphas
+        logger.info(f"desired_terminal_snr: {desired_terminal_snr} patched")
+        return betas
+    
 
     betas = noise_scheduler.betas
-    betas = enforce_zero_terminal_snr(betas)
+    betas = enforce_zero_terminal_snr(betas) if target_value == 0 else fix_noise_scheduler_betas_for_desired_terminal_snr(betas, target_value)
     alphas = 1.0 - betas
     alphas_cumprod = torch.cumprod(alphas, dim=0)
 
@@ -67,7 +103,7 @@ def apply_snr_weight(loss, timesteps, noise_scheduler, gamma, v_prediction=False
     snr = torch.stack([noise_scheduler.all_snr[t] for t in timesteps])
     min_snr_gamma = torch.minimum(snr, torch.full_like(snr, gamma))
     if v_prediction:
-        snr_weight = torch.div(min_snr_gamma, snr + 1).float().to(loss.device)
+        snr_weight = torch.div(min_snr_gamma, (snr + 1)).float().to(loss.device)
     else:
         snr_weight = torch.div(min_snr_gamma, snr).float().to(loss.device)
     loss = loss * snr_weight
@@ -100,7 +136,7 @@ def apply_debiased_estimation(loss, timesteps, noise_scheduler, v_prediction:boo
     snr_t = torch.stack([noise_scheduler.all_snr[t] for t in timesteps])  # batch_size
     snr_t = torch.minimum(snr_t, torch.ones_like(snr_t) * 1000)  # if timestep is 0, snr_t is inf, so limit it to 1000
     if v_prediction:
-        weight = 1 / torch.sqrt(snr_t + 1)
+        weight = torch.sqrt(snr_t) / (snr_t + 1) # ensures los sweight is 1~0
     else:
         weight = 1 / torch.sqrt(snr_t)
     loss = weight * loss
