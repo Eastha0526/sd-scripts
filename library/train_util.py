@@ -402,7 +402,10 @@ def decrypt_json_file(encrypted_file, password):
 
     # Return the JSON data
     return json_data
-
+SKIP_PATH_CHECK = False
+def set_skip_path_check(skip):
+    global SKIP_PATH_CHECK
+    SKIP_PATH_CHECK = skip
 class BucketManager:
     def __init__(self, no_upscale, max_reso, min_size, max_size, reso_steps) -> None:
         if max_size is not None:
@@ -830,7 +833,7 @@ class ControlNetSubset(BaseSubset):
         if not isinstance(other, ControlNetSubset):
             return NotImplemented
         return self.image_dir == other.image_dir and self.conditioning_data_dir == other.conditioning_data_dir
-
+ADAPTIVE_DROPOUT=True
 def shuffle_caption_by_separtor(caption, separator, caption_splitter):
     splitted_parts = caption.split(separator)
     #random.shuffle(splitted_parts)
@@ -899,6 +902,13 @@ class BaseDataset(torch.utils.data.Dataset):
 
         # caching
         self.caching_mode = None  # None, 'latents', 'text'
+        # adaptive dropout thresholds
+        self.min_dropout_rate = 0.1
+        self.max_dropout_rate = 0.85
+
+        # Will store computed dropout probabilities per directory, per tag
+        # e.g. self.dropout_prob[dir_name][tag] = float
+        self.dropout_prob = {}
 
     def set_seed(self, seed):
         self.seed = seed
@@ -918,8 +928,19 @@ class BaseDataset(torch.utils.data.Dataset):
         self.max_train_steps = max_train_steps
 
     def set_tag_frequency(self, dir_name, captions):
+        """
+        Updates the tag frequency dictionary for the given directory
+        based on the list of captions. Also updates total caption count.
+        Finally, recalculates dropout probabilities.
+        """
         frequency_for_dir = self.tag_frequency.get(dir_name, {})
         self.tag_frequency[dir_name] = frequency_for_dir
+
+        # Track how many lines/captions we've processed for this directory
+        frequency_for_dir["__total_captions__"] = frequency_for_dir.get(
+            "__total_captions__", 0
+        ) + len(captions)
+
         for caption in captions:
             for tag in caption.split(","):
                 tag = tag.strip()
@@ -928,6 +949,85 @@ class BaseDataset(torch.utils.data.Dataset):
                     frequency = frequency_for_dir.get(tag, 0)
                     frequency_for_dir[tag] = frequency + 1
 
+        # After updating frequencies, recalculate dropout probabilities
+        self.dropout_prob = {}
+        self.calculate_dropout_prob()
+
+    def calculate_dropout_prob(self):
+        """
+        Compute dropout probabilities for each directory and each tag
+        based on how frequently each tag appears in that directory.
+        A tag that appears in 100% of captions should have dropout probability ~max_dropout_rate.
+        A tag that appears in 0% of captions (theoretically not in the data anyway) => ~min_dropout_rate.
+        For intermediate frequencies, do a linear interpolation between min_dropout_rate and max_dropout_rate.
+        """
+        for dir_name, freq_for_dir in self.tag_frequency.items():
+            total_captions = freq_for_dir.get("__total_captions__", 0)
+            if total_captions == 0:
+                continue  # Avoid division by zero if no captions yet
+
+            # Create a dict to store dropout probabilities for this directory
+            self.dropout_prob[dir_name] = {}
+
+            for tag, count in freq_for_dir.items():
+                # Skip the special key
+                if tag == "__total_captions__":
+                    continue
+
+                # ratio = how often this tag appears among the directory's captions
+                ratio = count / total_captions  # in [0, 1]
+
+                # Linear interpolation between min_dropout_rate and max_dropout_rate:
+                # If ratio=1.0 => dropout ~ 0.85
+                # If ratio=0.0 => dropout ~ 0.1
+                dropout = (
+                    self.min_dropout_rate
+                    + (self.max_dropout_rate - self.min_dropout_rate) * ratio
+                )
+                # Clamp in [0, 1] just in case
+                dropout = max(0.0, min(1.0, dropout))
+                self.dropout_prob[dir_name][tag] = dropout
+
+    def process_caption_adaptive_dropout(self, subset: BaseSubset, caption: str):
+        """
+        Based on self.dropout_prob, randomly drops tags from the caption.
+        The subset object presumably can tell us which directory or category
+        it belongs to, so we know which directory's dropout probabilities to use.
+        """
+        # You may need to adapt how you get the directory name:
+        dir_name = getattr(subset, "dir_name", None)
+        if dir_name is None:
+            # Fallback or handle error
+            return caption
+
+        # If we have no dropout information for this directory, just return as is
+        if dir_name not in self.dropout_prob:
+            return caption
+
+        # Split into tags, drop them based on probability
+        tags = caption.split(",")
+        new_tags = []
+
+        for tag in tags:
+            original_tag = tag.strip().lower()
+            # Apply any replacement if configured
+            if original_tag in self.replacements:
+                original_tag = self.replacements[original_tag]
+
+            # Lookup dropout probability
+            drop_prob = self.dropout_prob[dir_name].get(original_tag, 0.0)
+
+            # Decide whether to keep this tag
+            if random.random() > drop_prob:
+                # keep the tag
+                new_tags.append(original_tag)
+            else:
+                # tag is dropped
+                pass
+
+        # Join them back into a comma-separated string
+        return ", ".join(new_tags)
+    
     def disable_token_padding(self):
         self.token_padding_disabled = True
 
@@ -937,7 +1037,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
     def add_replacement(self, str_from, str_to):
         self.replacements[str_from] = str_to
-
+    
     def process_caption(self, subset: BaseSubset, caption, imageinfo: ImageInfo = None, random_instance=None):
         """
         Processes caption by adding prefix/suffix and applying dropout in runtime.
@@ -950,7 +1050,9 @@ class BaseDataset(torch.utils.data.Dataset):
             caption = subset.caption_prefix + " " + caption
         if subset.caption_suffix:
             caption = caption + " " + subset.caption_suffix
-
+        if subset.shuffle_caption:
+            if ADAPTIVE_DROPOUT:
+                return self.process_caption_adaptive_dropout(subset, caption)
         # dropoutの決定：tag dropがこのメソッド内にあるのでここで行うのが良い
         is_drop_out = subset.caption_dropout_rate > 0 and random.random() < subset.caption_dropout_rate
         is_drop_out = (
@@ -1038,51 +1140,6 @@ class BaseDataset(torch.utils.data.Dataset):
                         "sensitive",
                         "nsfw",
                         "nudity",
-                        "adult content",
-                        "photo",
-                        "guro",
-                        "koma",
-                        "panties",
-                        "underwear",
-                        "lo" + "li",
-                        "sho" + "ta",
-                        "anime",
-                        "comic",
-                        "manga",
-                        "multiple",
-                        "chart",
-                        "collage",
-                        "diagram",
-                        "sheet",
-                        "lineup",
-                        "panels",
-                        "graph",
-                        "turnaround",
-                        "variation",
-                        "expression",
-                        "logo",
-                        "username",
-                        "text",
-                        "copyright",
-                        "artifact",
-                        "family tree",
-                        "bad ",
-                        "sign",
-                        "pubic",
-                        "jaggy",
-                        "topless",
-                        "bottomless",
-                        "twitter",
-                        "scat",
-                        "nude",
-                        "naked",
-                        "r-18",
-                        "pus"+ "sy",
-                        "nip"+"ple",
-                        "pen"+"is",
-                        "an" +"us", # sexual tokens should not be dropped and always checked
-                        "real",
-                        "figma"
                     ] # this must not be dropped
                     len_tokens = len(tokens)
                     if len_tokens < 10:
@@ -3340,6 +3397,9 @@ def add_optimizer_arguments(parser: argparse.ArgumentParser):
 
 def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: bool):
     parser.add_argument(
+        "--skip_file_existence_check", type=bool, default=False, help="skip file existence check / ファイルの存在チェックをスキップする"
+    )
+    parser.add_argument(
         "--output_dir", type=str, default=None, help="directory to output trained model / 学習後のモデル出力先ディレクトリ"
     )
     parser.add_argument(
@@ -4185,6 +4245,7 @@ def read_config_from_file(args: argparse.Namespace, parser: argparse.ArgumentPar
     args = parser.parse_args(namespace=config_args)
     args.config_file = os.path.splitext(args.config_file)[0]
     logger.info(args.config_file)
+    logger.info(args.dataset_config)
 
     return args
 
