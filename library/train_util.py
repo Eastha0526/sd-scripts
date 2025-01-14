@@ -93,7 +93,6 @@ from library.original_unet import UNet2DConditionModel
 
 logger_logged_lines = 0
 def log_every(messages, n):
-    return #disable
     global logger_logged_lines
     if logger_logged_lines % n == 0:
        logger.info(messages)
@@ -995,13 +994,15 @@ class BaseDataset(torch.utils.data.Dataset):
         it belongs to, so we know which directory's dropout probabilities to use.
         """
         # You may need to adapt how you get the directory name:
-        dir_name = getattr(subset, "dir_name", None)
+        dir_name = os.path.basename(subset.metadata_file) if isinstance(subset, FineTuningSubset) else subset.image_dir
         if dir_name is None:
             # Fallback or handle error
+            logger.warning("No directory name found for adaptive dropout, skipping...")
             return caption
 
         # If we have no dropout information for this directory, just return as is
         if dir_name not in self.dropout_prob:
+            logger.warning(f"No dropout probabilities found for directory {dir_name}, skipping...")
             return caption
 
         # Split into tags, drop them based on probability
@@ -1019,9 +1020,11 @@ class BaseDataset(torch.utils.data.Dataset):
 
             # Decide whether to keep this tag
             if random.random() > drop_prob:
+                
                 # keep the tag
                 new_tags.append(original_tag)
             else:
+                log_every(f"Dropped tag: {original_tag} (prob={drop_prob})", 1000)
                 # tag is dropped
                 pass
 
