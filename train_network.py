@@ -221,7 +221,11 @@ class NetworkTrainer:
             ), "when caching latents, either color_aug or random_crop cannot be used / latentをキャッシュするときはcolor_augとrandom_cropは使えません"
 
         self.assert_extra_args(args, train_dataset_group)
-        train_dataset_group.set_dropout_info(args.adaptive_dropout_min_prob, args.adaptive_dropout_max_prob, args.adaptive_dropout, args.adaptive_dropout_trigger_token)
+        if hasattr(train_dataset_group, 'datasets'):
+            for dataset in train_dataset_group.datasets:
+                dataset.set_dropout_info(args.adaptive_dropout_min_prob, args.adaptive_dropout_max_prob, args.adaptive_dropout, args.adaptive_dropout_trigger_token)
+        else:
+            train_dataset_group.set_dropout_info(args.adaptive_dropout_min_prob, args.adaptive_dropout_max_prob, args.adaptive_dropout, args.adaptive_dropout_trigger_token)
         # acceleratorを準備する
         logger.info("preparing accelerator")
         accelerator = train_util.prepare_accelerator(args)
