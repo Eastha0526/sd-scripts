@@ -832,7 +832,6 @@ class ControlNetSubset(BaseSubset):
         if not isinstance(other, ControlNetSubset):
             return NotImplemented
         return self.image_dir == other.image_dir and self.conditioning_data_dir == other.conditioning_data_dir
-ADAPTIVE_DROPOUT=True
 def shuffle_caption_by_separtor(caption, separator, caption_splitter):
     splitted_parts = caption.split(separator)
     #random.shuffle(splitted_parts)
@@ -902,12 +901,21 @@ class BaseDataset(torch.utils.data.Dataset):
         # caching
         self.caching_mode = None  # None, 'latents', 'text'
         # adaptive dropout thresholds
-        self.min_dropout_rate = 0.1
-        self.max_dropout_rate = 0.85
+        self.min_dropout_rate = 0.35
+        self.max_dropout_rate = 1
+        self.trigger_token = None
+        self.adaptive_dropout = False
 
         # Will store computed dropout probabilities per directory, per tag
         # e.g. self.dropout_prob[dir_name][tag] = float
         self.dropout_prob = {}
+
+    def set_dropout_info(self, min_dropout_rate, max_dropout_rate, adaptive_dropout, trigger_token = None):
+        self.min_dropout_rate = min_dropout_rate
+        self.max_dropout_rate = max_dropout_rate
+        self.adaptive_dropout = adaptive_dropout
+        self.trigger_token = trigger_token
+        logger.info(f"Set dropout info: min={min_dropout_rate}, max={max_dropout_rate}, adaptive={adaptive_dropout}")
 
     def set_seed(self, seed):
         self.seed = seed
@@ -994,7 +1002,7 @@ class BaseDataset(torch.utils.data.Dataset):
         it belongs to, so we know which directory's dropout probabilities to use.
         """
         # You may need to adapt how you get the directory name:
-        dir_name = os.path.basename(subset.metadata_file) if isinstance(subset, FineTuningSubset) else subset.image_dir
+        dir_name = os.path.basename(subset.metadata_file) if isinstance(subset, FineTuningSubset) else os.path.basename(subset.image_dir)
         if dir_name is None:
             # Fallback or handle error
             logger.warning("No directory name found for adaptive dropout, skipping...")
@@ -1002,7 +1010,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
         # If we have no dropout information for this directory, just return as is
         if dir_name not in self.dropout_prob:
-            logger.warning(f"No dropout probabilities found for directory {dir_name}, skipping...")
+            logger.warning(f"No dropout probabilities found for directory {dir_name}, skipping... available: {self.dropout_prob.keys()}")
             return caption
 
         # Split into tags, drop them based on probability
@@ -1011,6 +1019,11 @@ class BaseDataset(torch.utils.data.Dataset):
 
         for tag in tags:
             original_tag = tag.strip().lower()
+            # skip trigger token
+            if self.trigger_token and self.trigger_token in original_tag: # no dropout for trigger token
+                new_tags.append(original_tag)
+                continue
+            
             # Apply any replacement if configured
             if original_tag in self.replacements:
                 original_tag = self.replacements[original_tag]
@@ -1054,7 +1067,7 @@ class BaseDataset(torch.utils.data.Dataset):
         if subset.caption_suffix:
             caption = caption + " " + subset.caption_suffix
         if subset.shuffle_caption:
-            if ADAPTIVE_DROPOUT:
+            if self.adaptive_dropout:
                 return self.process_caption_adaptive_dropout(subset, caption)
         # dropoutの決定：tag dropがこのメソッド内にあるのでここで行うのが良い
         is_drop_out = subset.caption_dropout_rate > 0 and random.random() < subset.caption_dropout_rate
@@ -3813,6 +3826,32 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
     parser.add_argument(
         "--output_config", action="store_true", help="output command line args to given .toml file / 引数を.tomlファイルに出力する"
     )
+    # adaptive dropout
+    parser.add_argument(
+        "--adaptive_dropout",
+        action="store_true",
+        help="enable adaptive dropout for training / 学習時にadaptive dropoutを有効にする",
+    )#min_dropout_rate, max_dropout_rate, adaptive_dropout, trigger_token
+    parser.add_argument(
+        "--adaptive_dropout_min_prob",
+        type=float,
+        default=0.35,
+        help="minimum dropout probability for adaptive dropout / adaptive dropoutの最小dropout確率",
+    )
+    parser.add_argument(
+        "--adaptive_dropout_max_prob",
+        type=float,
+        default=1,
+        help="maximum dropout probability for adaptive dropout / adaptive dropoutの最大dropout確率",
+    )
+    parser.add_argument(
+        "--adaptive_dropout_trigger_token",
+        type=str,
+        default=None,
+        help="trigger token for adaptive dropout / adaptive dropoutのトリガートークン",
+    )
+    
+    
 
     # SAI Model spec
     parser.add_argument(
