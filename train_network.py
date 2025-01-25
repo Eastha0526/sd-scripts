@@ -145,7 +145,7 @@ class NetworkTrainer:
         cache_latents = args.cache_latents
         use_dreambooth_method = args.in_json is None
         use_user_config = args.dataset_config is not None
-
+        logger.info(f"args.dataset_config: {args.dataset_config}")
         if args.seed is None:
             args.seed = random.randint(0, 2**32)
         set_seed(args.seed)
@@ -221,7 +221,7 @@ class NetworkTrainer:
             ), "when caching latents, either color_aug or random_crop cannot be used / latentをキャッシュするときはcolor_augとrandom_cropは使えません"
 
         self.assert_extra_args(args, train_dataset_group)
-
+        train_dataset_group.set_dropout_info(args.adaptive_dropout_min_prob, args.adaptive_dropout_max_prob, args.adaptive_dropout, args.adaptive_dropout_trigger_token)
         # acceleratorを準備する
         logger.info("preparing accelerator")
         accelerator = train_util.prepare_accelerator(args)
