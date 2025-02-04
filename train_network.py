@@ -221,11 +221,6 @@ class NetworkTrainer:
             ), "when caching latents, either color_aug or random_crop cannot be used / latentをキャッシュするときはcolor_augとrandom_cropは使えません"
 
         self.assert_extra_args(args, train_dataset_group)
-        if hasattr(train_dataset_group, 'datasets'):
-            for dataset in train_dataset_group.datasets:
-                dataset.set_dropout_info(args.adaptive_dropout_min_prob, args.adaptive_dropout_max_prob, args.adaptive_dropout, args.adaptive_dropout_trigger_token)
-        else:
-            train_dataset_group.set_dropout_info(args.adaptive_dropout_min_prob, args.adaptive_dropout_max_prob, args.adaptive_dropout, args.adaptive_dropout_trigger_token)
         # acceleratorを準備する
         logger.info("preparing accelerator")
         accelerator = train_util.prepare_accelerator(args)
@@ -274,7 +269,7 @@ class NetworkTrainer:
             vae.requires_grad_(False)
             vae.eval()
             with torch.no_grad():
-                train_dataset_group.cache_latents(vae, args.vae_batch_size, args.cache_latents_to_disk, accelerator.is_main_process)
+                train_dataset_group.cache_latents(accelerator, vae, args.vae_batch_size, args.cache_latents_to_disk, accelerator.is_main_process)
             vae.to("cpu")
             clean_memory_on_device(accelerator.device)
 
