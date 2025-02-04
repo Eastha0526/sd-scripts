@@ -624,6 +624,10 @@ class BaseSubset:
         token_warmup_min: int,
         token_warmup_step: Union[float, int],
         multi_captions: bool = False,
+        adaptive_dropout: bool = False,
+        min_adaptive_dropout: float = 0.0,
+        max_adaptive_dropout: float = 0.0,
+        adaptive_dropout_trigger_token: str = None,
     ) -> None:
         self.image_dir = image_dir
         self.num_repeats = num_repeats
@@ -647,7 +651,97 @@ class BaseSubset:
         self.token_warmup_step = token_warmup_step  # N（N<1ならN*max_train_steps）ステップ目でタグの数が最大になる
 
         self.img_count = 0
+        self.dropout_prob = {}
+        self.tag_frequency = {}
+        self.min_dropout_rate = min_adaptive_dropout
+        self.max_dropout_rate = max_adaptive_dropout
+        self.trigger_token = adaptive_dropout_trigger_token
+        self.adaptive_dropout = adaptive_dropout
 
+    def set_tag_frequency(self, captions):
+        """
+        Recalculates dropout probabilities.
+        """
+        # Track how many lines/captions we've processed for this directory
+        self.tag_frequency["__total_captions__"] = self.tag_frequency.get(
+            "__total_captions__", 0
+        ) + len(captions)
+
+        for caption in captions:
+            for tag in caption.split(","):
+                tag = tag.strip()
+                if tag:
+                    tag = tag.lower()
+                    frequency = self.tag_frequency.get(tag, 0)
+                    self.tag_frequency[tag] = frequency + 1
+
+        # After updating frequencies, recalculate dropout probabilities
+        self.dropout_prob = {}
+        self.calculate_dropout_prob()
+
+    def calculate_dropout_prob(self):
+        """
+        Compute dropout probabilities for each directory and each tag
+        based on how frequently each tag appears in that directory.
+        A tag that appears in 100% of captions should have dropout probability ~max_dropout_rate.
+        A tag that appears in 0% of captions (theoretically not in the data anyway) => ~min_dropout_rate.
+        For intermediate frequencies, do a linear interpolation between min_dropout_rate and max_dropout_rate.
+        """
+        total_captions = self.tag_frequency.get("__total_captions__", 0)
+        for tag, count in self.tag_frequency.items():
+            # Skip the special key
+            if tag == "__total_captions__":
+                continue
+
+            # ratio = how often this tag appears among the directory's captions
+            ratio = count / total_captions  # in [0, 1]
+
+            # Linear interpolation between min_dropout_rate and max_dropout_rate:
+            # If ratio=1.0 => dropout ~ 0.85
+            # If ratio=0.0 => dropout ~ 0.1
+            dropout = (
+                self.min_dropout_rate
+                + (self.max_dropout_rate - self.min_dropout_rate) * ratio
+            )
+            # Clamp in [0, 1] just in case
+            dropout = max(0.0, min(1.0, dropout))
+            self.dropout_prob[tag] = dropout
+
+    def process_caption_adaptive_dropout(self, caption: str):
+        """
+        Based on self.dropout_prob, randomly drops tags from the caption.
+        The subset object presumably can tell us which directory or category
+        it belongs to, so we know which directory's dropout probabilities to use.
+        """
+        tags = caption.split(",")
+        new_tags = []
+
+        for tag in tags:
+            original_tag = tag.strip().lower()
+            # skip trigger token
+            if self.trigger_token and self.trigger_token in original_tag: # no dropout for trigger token
+                new_tags.append(original_tag)
+                continue
+
+            # Lookup dropout probability
+            drop_prob = self.dropout_prob.get(original_tag, 0.0)
+
+            # Decide whether to keep this tag
+            if random.random() > drop_prob:
+                
+                # keep the tag
+                new_tags.append(original_tag)
+            else:
+                if isinstance(self, FineTuningSubset):
+                    info_file = self.metadata_file
+                else:
+                    info_file = self.image_dir
+                log_every(f"Dropped tag: {original_tag} (prob={drop_prob}), {info_file}", 1000)
+                # tag is dropped
+                pass
+
+        # Join them back into a comma-separated string
+        return ", ".join(new_tags)
 
 class DreamBoothSubset(BaseSubset):
     def __init__(
@@ -676,6 +770,10 @@ class DreamBoothSubset(BaseSubset):
         token_warmup_min,
         token_warmup_step,
         multi_captions: bool = False,
+        adaptive_dropout: bool = False,
+        min_adaptive_dropout: float = 0.0,
+        max_adaptive_dropout: float = 0.0,
+        adaptive_dropout_trigger_token: str = None,
     ) -> None:
         assert image_dir is not None, "image_dir must be specified / image_dirは指定が必須です"
 
@@ -699,6 +797,11 @@ class DreamBoothSubset(BaseSubset):
             caption_suffix,
             token_warmup_min,
             token_warmup_step,
+            multi_captions,
+            adaptive_dropout,
+            min_adaptive_dropout,
+            max_adaptive_dropout,
+            adaptive_dropout_trigger_token,
         )
 
         self.is_reg = is_reg
@@ -738,6 +841,10 @@ class FineTuningSubset(BaseSubset):
         token_warmup_min,
         token_warmup_step,
         multi_captions: bool = False,
+        adaptive_dropout: bool = False,
+        min_adaptive_dropout: float = 0.0,
+        max_adaptive_dropout: float = 0.0,
+        adaptive_dropout_trigger_token: str = None,
     ) -> None:
         assert metadata_file is not None, "metadata_file must be specified / metadata_fileは指定が必須です"
 
@@ -761,7 +868,11 @@ class FineTuningSubset(BaseSubset):
             caption_suffix,
             token_warmup_min,
             token_warmup_step,
-            multi_captions
+            multi_captions,
+            adaptive_dropout,
+            min_adaptive_dropout,
+            max_adaptive_dropout,
+            adaptive_dropout_trigger_token,
         )
 
         self.metadata_file = metadata_file
@@ -904,18 +1015,6 @@ class BaseDataset(torch.utils.data.Dataset):
         self.min_dropout_rate = 0.35
         self.max_dropout_rate = 1
         self.trigger_token = None
-        self.adaptive_dropout = False
-
-        # Will store computed dropout probabilities per directory, per tag
-        # e.g. self.dropout_prob[dir_name][tag] = float
-        self.dropout_prob = {}
-
-    def set_dropout_info(self, min_dropout_rate, max_dropout_rate, adaptive_dropout, trigger_token = None):
-        self.min_dropout_rate = min_dropout_rate
-        self.max_dropout_rate = max_dropout_rate
-        self.adaptive_dropout = adaptive_dropout
-        self.trigger_token = trigger_token
-        logger.info(f"Set dropout info: min={min_dropout_rate}, max={max_dropout_rate}, adaptive={adaptive_dropout}")
 
     def set_seed(self, seed):
         self.seed = seed
@@ -933,116 +1032,6 @@ class BaseDataset(torch.utils.data.Dataset):
 
     def set_max_train_steps(self, max_train_steps):
         self.max_train_steps = max_train_steps
-
-    def set_tag_frequency(self, dir_name, captions):
-        """
-        Updates the tag frequency dictionary for the given directory
-        based on the list of captions. Also updates total caption count.
-        Finally, recalculates dropout probabilities.
-        """
-        frequency_for_dir = self.tag_frequency.get(dir_name, {})
-        self.tag_frequency[dir_name] = frequency_for_dir
-
-        # Track how many lines/captions we've processed for this directory
-        frequency_for_dir["__total_captions__"] = frequency_for_dir.get(
-            "__total_captions__", 0
-        ) + len(captions)
-
-        for caption in captions:
-            for tag in caption.split(","):
-                tag = tag.strip()
-                if tag:
-                    tag = tag.lower()
-                    frequency = frequency_for_dir.get(tag, 0)
-                    frequency_for_dir[tag] = frequency + 1
-
-        # After updating frequencies, recalculate dropout probabilities
-        self.dropout_prob = {}
-        self.calculate_dropout_prob()
-
-    def calculate_dropout_prob(self):
-        """
-        Compute dropout probabilities for each directory and each tag
-        based on how frequently each tag appears in that directory.
-        A tag that appears in 100% of captions should have dropout probability ~max_dropout_rate.
-        A tag that appears in 0% of captions (theoretically not in the data anyway) => ~min_dropout_rate.
-        For intermediate frequencies, do a linear interpolation between min_dropout_rate and max_dropout_rate.
-        """
-        for dir_name, freq_for_dir in self.tag_frequency.items():
-            total_captions = freq_for_dir.get("__total_captions__", 0)
-            if total_captions == 0:
-                continue  # Avoid division by zero if no captions yet
-
-            # Create a dict to store dropout probabilities for this directory
-            self.dropout_prob[dir_name] = {}
-
-            for tag, count in freq_for_dir.items():
-                # Skip the special key
-                if tag == "__total_captions__":
-                    continue
-
-                # ratio = how often this tag appears among the directory's captions
-                ratio = count / total_captions  # in [0, 1]
-
-                # Linear interpolation between min_dropout_rate and max_dropout_rate:
-                # If ratio=1.0 => dropout ~ 0.85
-                # If ratio=0.0 => dropout ~ 0.1
-                dropout = (
-                    self.min_dropout_rate
-                    + (self.max_dropout_rate - self.min_dropout_rate) * ratio
-                )
-                # Clamp in [0, 1] just in case
-                dropout = max(0.0, min(1.0, dropout))
-                self.dropout_prob[dir_name][tag] = dropout
-
-    def process_caption_adaptive_dropout(self, subset: BaseSubset, caption: str):
-        """
-        Based on self.dropout_prob, randomly drops tags from the caption.
-        The subset object presumably can tell us which directory or category
-        it belongs to, so we know which directory's dropout probabilities to use.
-        """
-        # You may need to adapt how you get the directory name:
-        dir_name = os.path.basename(subset.metadata_file) if isinstance(subset, FineTuningSubset) else os.path.basename(subset.image_dir)
-        if dir_name is None:
-            # Fallback or handle error
-            logger.warning("No directory name found for adaptive dropout, skipping...")
-            return caption
-
-        # If we have no dropout information for this directory, just return as is
-        if dir_name not in self.dropout_prob:
-            logger.warning(f"No dropout probabilities found for directory {dir_name}, skipping... available: {self.dropout_prob.keys()}")
-            return caption
-
-        # Split into tags, drop them based on probability
-        tags = caption.split(",")
-        new_tags = []
-
-        for tag in tags:
-            original_tag = tag.strip().lower()
-            # skip trigger token
-            if self.trigger_token and self.trigger_token in original_tag: # no dropout for trigger token
-                new_tags.append(original_tag)
-                continue
-            
-            # Apply any replacement if configured
-            if original_tag in self.replacements:
-                original_tag = self.replacements[original_tag]
-
-            # Lookup dropout probability
-            drop_prob = self.dropout_prob[dir_name].get(original_tag, 0.0)
-
-            # Decide whether to keep this tag
-            if random.random() > drop_prob:
-                
-                # keep the tag
-                new_tags.append(original_tag)
-            else:
-                log_every(f"Dropped tag: {original_tag} (prob={drop_prob})", 1000)
-                # tag is dropped
-                pass
-
-        # Join them back into a comma-separated string
-        return ", ".join(new_tags)
     
     def disable_token_padding(self):
         self.token_padding_disabled = True
@@ -1066,9 +1055,8 @@ class BaseDataset(torch.utils.data.Dataset):
             caption = subset.caption_prefix + " " + caption
         if subset.caption_suffix:
             caption = caption + " " + subset.caption_suffix
-        if subset.shuffle_caption:
-            if self.adaptive_dropout:
-                return self.process_caption_adaptive_dropout(subset, caption)
+        if subset.adaptive_dropout:
+            return subset.process_caption_adaptive_dropout(caption)
         # dropoutの決定：tag dropがこのメソッド内にあるのでここで行うのが良い
         is_drop_out = subset.caption_dropout_rate > 0 and random.random() < subset.caption_dropout_rate
         is_drop_out = (
@@ -1431,7 +1419,7 @@ class BaseDataset(torch.utils.data.Dataset):
             ]
         )
 
-    def cache_latents(self, vae, vae_batch_size=1, cache_to_disk=False, is_main_process=True):
+    def cache_latents(self, accelerator, vae, vae_batch_size=1, cache_to_disk=False, is_main_process=True):
         # マルチGPUには対応していないので、そちらはtools/cache_latents.pyを使うこと
         logger.info("caching latents.")
 
@@ -2005,7 +1993,7 @@ class DreamBoothDataset(BaseDataset):
                         else:
                             captions.append(cap_for_img)
 
-            self.set_tag_frequency(os.path.basename(subset.image_dir), captions)  # タグ頻度を記録
+            subset.set_tag_frequency(captions)  # タグ頻度を記録
 
             if missing_captions:
                 number_of_missing_captions = len(missing_captions)
@@ -2122,6 +2110,10 @@ class FineTuningDataset(BaseDataset):
         bucket_no_upscale: bool,
         debug_dataset: bool,
         multi_captions: bool = False,
+        adaptive_dropout: bool = False,
+        min_adaptive_dropout: float = 0.0,
+        max_adaptive_dropout: float = 0.0,
+        adaptive_dropout_trigger_token: str = None,
     ) -> None:
         super().__init__(tokenizer, max_token_length, resolution, network_multiplier, debug_dataset)
 
@@ -2238,7 +2230,7 @@ class FineTuningDataset(BaseDataset):
             self.num_train_images += len(metadata) * subset.num_repeats
 
             # TODO do not record tag freq when no tag
-            self.set_tag_frequency(os.path.basename(subset.metadata_file), tags_list)
+            subset.set_tag_frequency(tags_list)
             subset.img_count = len(metadata)
             self.subsets.append(subset)
 
@@ -2471,7 +2463,7 @@ class ControlNetDataset(BaseDataset):
         self.bucket_manager = self.dreambooth_dataset_delegate.bucket_manager
         self.buckets_indices = self.dreambooth_dataset_delegate.buckets_indices
 
-    def cache_latents(self, vae, vae_batch_size=1, cache_to_disk=False, is_main_process=True):
+    def cache_latents(self, accelerator, vae, vae_batch_size=1, cache_to_disk=False, is_main_process=True):
         return self.dreambooth_dataset_delegate.cache_latents(vae, vae_batch_size, cache_to_disk, is_main_process)
 
     def __len__(self):
@@ -2563,10 +2555,10 @@ class DatasetGroup(torch.utils.data.ConcatDataset):
         for dataset in self.datasets:
             dataset.enable_XTI(*args, **kwargs)
 
-    def cache_latents(self, vae, vae_batch_size=1, cache_to_disk=False, is_main_process=True):
+    def cache_latents(self, accelerator, vae, vae_batch_size=1, cache_to_disk=False, is_main_process=True):
         for i, dataset in enumerate(self.datasets):
             logger.info(f"[Dataset {i}]")
-            dataset.cache_latents(vae, vae_batch_size, cache_to_disk, is_main_process)
+            dataset.cache_latents(accelerator, vae, vae_batch_size, cache_to_disk, is_main_process)
 
     def cache_text_encoder_outputs(
         self, tokenizers, text_encoders, device, weight_dtype, cache_to_disk=False, is_main_process=True
