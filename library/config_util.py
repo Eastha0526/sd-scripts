@@ -79,6 +79,10 @@ class BaseSubsetParams:
     token_warmup_min: int = 1
     token_warmup_step: float = 0
     multi_captions: bool = False
+    adaptive_dropout: bool = False
+    min_adaptive_dropout: float = 0.0
+    max_adaptive_dropout: float = 0.0
+    adaptive_dropout_trigger_token: str = None
 @dataclass
 class DreamBoothSubsetParams(BaseSubsetParams):
     is_reg: bool = False
@@ -195,6 +199,10 @@ class ConfigSanitizer:
         "token_warmup_step": Any(float, int),
         "caption_prefix": str,
         "caption_suffix": str,
+        "adaptive_dropout": bool,
+        "min_adaptive_dropout": Any(float, int),
+        "max_adaptive_dropout": Any(float, int),
+        "adaptive_dropout_trigger_token": str,
     }
     # DO means DropOut
     DO_SUBSET_ASCENDABLE_SCHEMA = {
