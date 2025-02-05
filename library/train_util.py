@@ -5815,7 +5815,7 @@ def get_all_paths_like_imagepaths_by_time(image_path):
                 timestamp_str = file.split("_")[-2]
                 timestamp = datetime.datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
                 # allow 60-second difference
-                if abs((timestamp - original_timestamp).total_seconds()) < 60:
+                if abs((timestamp - original_timestamp).total_seconds()) < 300:
                     yield os.path.join(root, file)
 
 def sample_image_inference(
