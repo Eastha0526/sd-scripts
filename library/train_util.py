@@ -707,7 +707,7 @@ class BaseSubset:
             dropout = max(0.0, min(1.0, dropout))
             self.dropout_prob[tag] = dropout
 
-    def process_caption_adaptive_dropout(self, caption: str):
+    def process_caption_adaptive_dropout(self, caption: str, shuffle: bool = False) -> str:
         """
         Based on self.dropout_prob, randomly drops tags from the caption.
         The subset object presumably can tell us which directory or category
@@ -739,7 +739,8 @@ class BaseSubset:
                 log_every(f"Dropped tag: {original_tag} (prob={drop_prob}), {info_file}", 1000)
                 # tag is dropped
                 pass
-
+        if shuffle:
+            random.shuffle(new_tags)
         # Join them back into a comma-separated string
         return ", ".join(new_tags)
 
@@ -1056,7 +1057,7 @@ class BaseDataset(torch.utils.data.Dataset):
         if subset.caption_suffix:
             caption = caption + " " + subset.caption_suffix
         if subset.adaptive_dropout:
-            return subset.process_caption_adaptive_dropout(caption)
+            return subset.process_caption_adaptive_dropout(caption, shuffle=subset.shuffle_caption)
         # dropoutの決定：tag dropがこのメソッド内にあるのでここで行うのが良い
         is_drop_out = subset.caption_dropout_rate > 0 and random.random() < subset.caption_dropout_rate
         is_drop_out = (
