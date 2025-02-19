@@ -688,21 +688,27 @@ class BaseSubset:
         For intermediate frequencies, do a linear interpolation between min_dropout_rate and max_dropout_rate.
         """
         total_captions = self.tag_frequency.get("__total_captions__", 0)
+        
+        # Controls how steep the sigmoid is around the center
+        alpha = 10.0
+        # The ratio value around which the sigmoid will transition from low to high
+        center = 0.85
+        
         for tag, count in self.tag_frequency.items():
-            # Skip the special key
             if tag == "__total_captions__":
                 continue
 
-            # ratio = how often this tag appears among the directory's captions
-            ratio = count / total_captions  # in [0, 1]
+            ratio = count / total_captions if total_captions != 0 else 0.0
 
-            # Linear interpolation between min_dropout_rate and max_dropout_rate:
-            # If ratio=1.0 => dropout ~ 0.85
-            # If ratio=0.0 => dropout ~ 0.1
+            # Sigmoid-like function centered at ratio = 0.85
+            logistic = 1.0 / (1.0 + math.exp(-alpha * (ratio - center)))
+            
+            # Scale this logistic value between min_dropout_rate and max_dropout_rate
             dropout = (
-                self.min_dropout_rate
-                + (self.max_dropout_rate - self.min_dropout_rate) * ratio
+                self.min_dropout_rate +
+                (self.max_dropout_rate - self.min_dropout_rate) * logistic
             )
+            
             # Clamp in [0, 1] just in case
             dropout = max(0.0, min(1.0, dropout))
             self.dropout_prob[tag] = dropout
