@@ -10,6 +10,33 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def fourier_highfreq_loss(pred: torch.Tensor, target: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
+    """
+    Compute a high-frequency focused loss by comparing pred and target in the Fourier domain.
+    Emphasizes differences in high-frequency components while down-weighting low-frequency errors.
+    """
+    # Ensure inputs are float32 for numerical stability in FFT
+    pred_f = torch.fft.fft2(pred.float(), norm="ortho")
+    target_f = torch.fft.fft2(target.float(), norm="ortho")
+    # Build frequency weighting mask (higher weight for high frequencies)
+    B, C, H, W = pred.shape  # batch, channels, height, width
+    yy = torch.arange(H, device=pred.device)
+    xx = torch.arange(W, device=pred.device)
+    # Center frequencies (0 at center)
+    yy = (yy - H//2).abs(); xx = (xx - W//2).abs()
+    Y, X = torch.meshgrid(yy, xx, indexing='ij')
+    freq_radius = torch.sqrt(Y**2 + X**2).float()
+    mask = freq_radius / (freq_radius.max() + 1e-8)  # normalize 0 to 1
+    mask = mask.to(pred.device)
+    # Expand mask to cover batch and channels
+    mask = mask.unsqueeze(0).unsqueeze(0)  # shape [1,1,H,W]
+    # Apply mask to Fourier difference
+    diff = pred_f - target_f  # complex tensor
+    diff_real = diff.real * mask
+    diff_imag = diff.imag * mask
+    # Compute MSE in frequency domain
+    per_sample_loss = (diff_real**2 + diff_imag**2).mean(dim=(1,2,3))  # mean over C,H,W for each sample
+    return per_sample_loss.mean() if reduction == "mean" else per_sample_loss
 
 def prepare_scheduler_for_custom_training(noise_scheduler, device):
     if hasattr(noise_scheduler, "all_snr"):
