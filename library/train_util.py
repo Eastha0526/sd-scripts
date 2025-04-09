@@ -173,6 +173,11 @@ CONVERTABLE_DICT = {
     "questionable" : ["nsfw", "with partial nudity", "questionable", "questionable content"],
     "explicit" : ["explicit", "nsfw", "with nudity", "adult content", "explicit material"],
 }
+if os.path.exists('character_cooccurrence_sigmoid.json'):
+    with open('character_cooccurrence_sigmoid.json', 'r', encoding='utf-8') as f:
+        CHAR_COOCCURRENCE_DROPOUT = json.load(f)
+else:
+    CHAR_COOCCURRENCE_DROPOUT = {}
 
 popular_chars_names = ["momiji", "character", "futo", "inaba", "yor", "seija", "stout", "sakuya", "yazawa", "tamamo", "ellen", "d'arc", "murasa", "misaka", "hearn", "kisaragi", "kaku", "ichinose", "hatate", "suwako", "douji", "aqua", "yoko", "samidare", "kikuchi", "nilou", "yuyuko", "sekibanki", "asashio", "rumia", "megurine", "kotori", "formidable", "frieren", "satori", "shijou", "kyrielight", "kanako", "remilia", "koakuma", "gardevoir", "littner", "princess", "d.va", "saber", "higuchi", "koishi", "bridget", "minami", "inkling", "monster", "kokomi", "miho", "kasodani", "houraisan", "kongou", "artoria", "chen", "pyra", "patchouli", "konpaku", "tojo", "mercury", "shinobu", "tewi", "suika", "izumi", "shiroko", "inazuma", "kurodani", "akemi", "fujiwara", "mononobe", "kokoro", "nagae", "azusa", "youmu", "oma", "kafka", "c.c.", "arisu", "abigail", "mae", "yumemi", "manhattan", "mona", "shirakami", "zhongli", "shibuya", "kawashiro", "kaenbyou", "zero", "nakano", "yuudachi", "tao", "eula", "hoshimachi", "kasen", "raiden", "yuugi", "takane", "murakumo", "hoshii", "watanabe", "rio", "minamoto", "kaname", "minato", "pendragon", "williams", "udongein", "shower", "super", "ryuuko", "himekaidou", "mirko", "cammy", "sayaka", "riamu", "reimu", "yasaka", "komeiji", "nightbug", "tachyon", "kokichi", "lumine", "utsuho", "rem", "tatsumaki", "shimamura", "sonoda", "takagaki", "shenhe", "kagerou", "miki", "houjuu", "lillie", "nagato", "senketsu", "amami", "player", "byakuren", "junko", "asuna", "kashima", "komachi", "kinomoto", "power", "kagamine", "kirisame", "kogasa", "sanae", "souji", "nico", "seiga", "mokou", "aran", "iono", "usami", "nazrin", "akiyama", "kamisato", "joe", "miku", "nozomi", "shooter", "nahida", "luka", "mythra", "claudius", "kyoko", "yagokoro", "iku", "aya", "kaede", "takina", "morrigan", "amiya", "gokou", "yoshika", "suzuya", "dawn", "kamishirasawa", "shuten", "okita", "joseph", "reisalin", "ruri", "haruka", "nitori", "marnie", "plana", "renko", "shameimaru", "samus", "makoto", "holo", "doll", "yuuka", "hinanawi", "hatsune", "shiranui", "daiyousei", "kanzaki", "magician", "rembran", "reiuji", "jougasaki", "tohsaka", "maki", "ibuki", "karin", "kai", "white", "oshino", "koharu", "bowsette", "eiki", "toki", "ayaka", "cafe", "sagiri", "yelan", "zeppeli", "zelda", "wriggle", "hata", "ganaha", "saigyouji", "shimakaze", "mayuzumi", "shogun", "lorelei", "einzbern", "fuyuko", "knowledge", "sonico", "tifa", "rensouhou-chan", "rin", "kyouko", "kaguya", "serval", "nino", "ranko", "madoka", "flandre", "kisaki", "hong", "illyasviel", "koume", "hamakaze", "chun-li", "miko", "oyama", "shanghai", "joestar", "uzuki", "umi", "yui", "kaga", "tomoe", "mika", "mash", "ganyu", "ibaraki", "fubuki", "miorine", "dark", "ayanami", "arona", "2b", "boo", "eirin", "kazusa", "mio", "aensland", "anthonio", "von", "meiling", "parsee", "tachibana", "warrior", "kitagawa", "fumika", "marine", "yamame", "alter", "marisa", "rikka", "megumin", "moriya", "sparkle", "nishizumi", "matoi", "takao", "raikou", "briar", "minamitsu", "rei", "imaizumi", "asuka", "kazami", "hk416", "shiki", "nero", "keine", "amatsukaze", "karyl", "hina", "chino", "mari", "nanami", "izayoi", "yae", "onozuka", "nishikigi", "nishikino", "yamato", "makima", "suigintou", "sagisawa","mizuhashi", "yotsuba", "chiaki", "margatroid", "ushio", "mikoto", "ayase", "mai", "hitori", "venti", "agnes", "scathach", "yoimiya", "gawr", "sagume", "ooyodo", "reisen", "chihaya", "haruhi", "gumi", "akagi", "souryuu", "hirasawa", "homura", "shigure", "hibiki", "yuzuki", "acheron", "link", "sakura", "ryuujou", "atago", "inubashiri", "mami", "nue", "yukari", "eugen", "jeanne", "gura", "firefly", "hestia", "anchovy", "haruna", "aru", "houshou", "gotoh", "akatsuki", "kishin", "alice", "kijin", "hijiri", "kagiyama", "yakumo", "suisei", "ro-500", "keqing", "testarossa", "scarlet", "iowa", "suletta", "tenshi", "langley", "lockhart", "tatara", "mystia", "adachi", "rosa", "hoshiguma", "yuki", "hakurei", "furina", "daiwa", "mahiro", "aris", "suzumiya", "kochiya", "inoue", "fate", "nami", "hunter", "tenryuu", "shirasaka", "astolfo", "caesar", "prinz", "marin", "toyosatomimi", "kafuu", "takarada", "hoshino", "clownpiece", "cynthia", "miyako", "darjeeling", "sangonomiya", "chisato", "rice", "ikazuchi", "cirno", "maribel", "mizumiya", "niko", "kikirara", "riona"]
 no_dropout_tokens = [
@@ -203,7 +208,7 @@ no_dropout_tokens = [
     "koma",
     # "pov",
     "censor",
-    "upside" # these are critical tags for image comprehension
+    "upside", # these are critical tags for image comprehension
     "guro",
     "scat",
     "gore",
@@ -402,6 +407,46 @@ def decrypt_json_file(encrypted_file, password):
     # Return the JSON data
     return json_data
 SKIP_PATH_CHECK = False
+def dropout_coocurrence(tokens):
+    assert isinstance(tokens, list), "tokens should be a list"
+    #CHAR_COOCCURRENCE_DROPOUT
+    tokens_underbar = [t.replace(" ", "_") for t in tokens]
+    character_prefix_map = {}
+    # if character: prefix exists, collect
+    for i, token in enumerate(tokens_underbar):
+        if "character:" in token:
+            char_name = token.split("character:")[1]
+            if char_name not in character_prefix_map:
+                character_prefix_map[char_name] = token
+            tokens_underbar[i] = char_name # remove character: prefix
+    # we will recover them after dropout
+    
+    char_tags = [t for t in tokens_underbar if t in CHAR_COOCCURRENCE_DROPOUT] # ["alice", ...]
+    if len(char_tags) == 0:
+        return tokens
+    merged_dict = {} # which holds token:prob max values
+    for token in tokens_underbar:
+        if token in char_tags:
+            continue
+        for char_tag in char_tags:
+            if token in CHAR_COOCCURRENCE_DROPOUT[char_tag]["tags"]:
+                merged_dict[token] = max(merged_dict.get(token, 0), CHAR_COOCCURRENCE_DROPOUT[char_tag]["tags"][token]["ratio"])
+    if len(merged_dict) == 0:
+        return tokens # no coocurrence
+    # dropout
+    selected = []
+    for token in tokens_underbar:
+        if token in merged_dict:
+            continue
+        if token in character_prefix_map:
+            selected.append(character_prefix_map[token])
+        else:
+            selected.append(token)
+    for token, prob in merged_dict.items():
+        if random.random() > prob:
+            selected.append(token)
+    log_every(f"CHAR_COOCCURRENCE_DROPOUT: {selected}, char_tags : {char_tags}", 25)
+    return selected
 def set_skip_path_check(skip):
     global SKIP_PATH_CHECK
     SKIP_PATH_CHECK = skip
@@ -1137,6 +1182,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     flex_tokens = flex_tokens[:tokens_len]
 
                 def dropout_tags(tokens):
+                    assert isinstance(tokens, list), f"tokens must be a list, but got {type(tokens)} with {tokens}"
                     # drop until token length gets smaller than 225 (hardcoded here)
                     if len(tokens) > 225:
                         while len(tokens) > 225:
@@ -1220,7 +1266,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
                 #if subset.shuffle_caption:
                 #    random.shuffle(flex_tokens)
-
+                flex_tokens = dropout_coocurrence(flex_tokens)
                 flex_tokens = dropout_tags(flex_tokens)
                 fixed_tokens, flex_tokens = convert_tags_if_needed(fixed_tokens), convert_tags_if_needed(flex_tokens)
                 # by random chance, use different join
@@ -2148,8 +2194,11 @@ class FineTuningDataset(BaseDataset):
                 if subset.metadata_file.endswith("_enc.json"):
                     metadata = decrypt_json_file(subset.metadata_file, "passwd")
                 else:
-                    with open(subset.metadata_file, "rt", encoding="utf-8") as f:
-                        metadata = json.load(f)
+                    #with open(subset.metadata_file, "rt", encoding="utf-8") as f:
+                        #metadata = json.load(f)
+                    # orjson
+                    with open(subset.metadata_file, "rb") as f:
+                        metadata = orjson.loads(f.read())
             else:
                 raise ValueError(f"no metadata / メタデータファイルがありません: {subset.metadata_file}")
 
@@ -3453,6 +3502,8 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
         action="store_true",
         help="resume from huggingface (ex: --resume {repo_id}/{path_in_repo}:{revision}:{repo_type}) / huggingfaceから学習を再開する(例: --resume {repo_id}/{path_in_repo}:{revision}:{repo_type})",
     )
+    parser.add_argument("--fourier_loss_weight", type=float, default=0.0,
+                    help="Weight for the Fourier high-frequency loss (0 to disable). Recommended: 0.5?")
     parser.add_argument(
         "--async_upload",
         action="store_true",
