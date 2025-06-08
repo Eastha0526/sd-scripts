@@ -173,11 +173,6 @@ CONVERTABLE_DICT = {
     "questionable" : ["nsfw", "with partial nudity", "questionable", "questionable content"],
     "explicit" : ["explicit", "nsfw", "with nudity", "adult content", "explicit material"],
 }
-if os.path.exists('character_cooccurrence_sigmoid.json'):
-    with open('character_cooccurrence_sigmoid.json', 'r', encoding='utf-8') as f:
-        CHAR_COOCCURRENCE_DROPOUT = json.load(f)
-else:
-    CHAR_COOCCURRENCE_DROPOUT = {}
 
 popular_chars_names = ["momiji", "character", "futo", "inaba", "yor", "seija", "stout", "sakuya", "yazawa", "tamamo", "ellen", "d'arc", "murasa", "misaka", "hearn", "kisaragi", "kaku", "ichinose", "hatate", "suwako", "douji", "aqua", "yoko", "samidare", "kikuchi", "nilou", "yuyuko", "sekibanki", "asashio", "rumia", "megurine", "kotori", "formidable", "frieren", "satori", "shijou", "kyrielight", "kanako", "remilia", "koakuma", "gardevoir", "littner", "princess", "d.va", "saber", "higuchi", "koishi", "bridget", "minami", "inkling", "monster", "kokomi", "miho", "kasodani", "houraisan", "kongou", "artoria", "chen", "pyra", "patchouli", "konpaku", "tojo", "mercury", "shinobu", "tewi", "suika", "izumi", "shiroko", "inazuma", "kurodani", "akemi", "fujiwara", "mononobe", "kokoro", "nagae", "azusa", "youmu", "oma", "kafka", "c.c.", "arisu", "abigail", "mae", "yumemi", "manhattan", "mona", "shirakami", "zhongli", "shibuya", "kawashiro", "kaenbyou", "zero", "nakano", "yuudachi", "tao", "eula", "hoshimachi", "kasen", "raiden", "yuugi", "takane", "murakumo", "hoshii", "watanabe", "rio", "minamoto", "kaname", "minato", "pendragon", "williams", "udongein", "shower", "super", "ryuuko", "himekaidou", "mirko", "cammy", "sayaka", "riamu", "reimu", "yasaka", "komeiji", "nightbug", "tachyon", "kokichi", "lumine", "utsuho", "rem", "tatsumaki", "shimamura", "sonoda", "takagaki", "shenhe", "kagerou", "miki", "houjuu", "lillie", "nagato", "senketsu", "amami", "player", "byakuren", "junko", "asuna", "kashima", "komachi", "kinomoto", "power", "kagamine", "kirisame", "kogasa", "sanae", "souji", "nico", "seiga", "mokou", "aran", "iono", "usami", "nazrin", "akiyama", "kamisato", "joe", "miku", "nozomi", "shooter", "nahida", "luka", "mythra", "claudius", "kyoko", "yagokoro", "iku", "aya", "kaede", "takina", "morrigan", "amiya", "gokou", "yoshika", "suzuya", "dawn", "kamishirasawa", "shuten", "okita", "joseph", "reisalin", "ruri", "haruka", "nitori", "marnie", "plana", "renko", "shameimaru", "samus", "makoto", "holo", "doll", "yuuka", "hinanawi", "hatsune", "shiranui", "daiyousei", "kanzaki", "magician", "rembran", "reiuji", "jougasaki", "tohsaka", "maki", "ibuki", "karin", "kai", "white", "oshino", "koharu", "bowsette", "eiki", "toki", "ayaka", "cafe", "sagiri", "yelan", "zeppeli", "zelda", "wriggle", "hata", "ganaha", "saigyouji", "shimakaze", "mayuzumi", "shogun", "lorelei", "einzbern", "fuyuko", "knowledge", "sonico", "tifa", "rensouhou-chan", "rin", "kyouko", "kaguya", "serval", "nino", "ranko", "madoka", "flandre", "kisaki", "hong", "illyasviel", "koume", "hamakaze", "chun-li", "miko", "oyama", "shanghai", "joestar", "uzuki", "umi", "yui", "kaga", "tomoe", "mika", "mash", "ganyu", "ibaraki", "fubuki", "miorine", "dark", "ayanami", "arona", "2b", "boo", "eirin", "kazusa", "mio", "aensland", "anthonio", "von", "meiling", "parsee", "tachibana", "warrior", "kitagawa", "fumika", "marine", "yamame", "alter", "marisa", "rikka", "megumin", "moriya", "sparkle", "nishizumi", "matoi", "takao", "raikou", "briar", "minamitsu", "rei", "imaizumi", "asuka", "kazami", "hk416", "shiki", "nero", "keine", "amatsukaze", "karyl", "hina", "chino", "mari", "nanami", "izayoi", "yae", "onozuka", "nishikigi", "nishikino", "yamato", "makima", "suigintou", "sagisawa","mizuhashi", "yotsuba", "chiaki", "margatroid", "ushio", "mikoto", "ayase", "mai", "hitori", "venti", "agnes", "scathach", "yoimiya", "gawr", "sagume", "ooyodo", "reisen", "chihaya", "haruhi", "gumi", "akagi", "souryuu", "hirasawa", "homura", "shigure", "hibiki", "yuzuki", "acheron", "link", "sakura", "ryuujou", "atago", "inubashiri", "mami", "nue", "yukari", "eugen", "jeanne", "gura", "firefly", "hestia", "anchovy", "haruna", "aru", "houshou", "gotoh", "akatsuki", "kishin", "alice", "kijin", "hijiri", "kagiyama", "yakumo", "suisei", "ro-500", "keqing", "testarossa", "scarlet", "iowa", "suletta", "tenshi", "langley", "lockhart", "tatara", "mystia", "adachi", "rosa", "hoshiguma", "yuki", "hakurei", "furina", "daiwa", "mahiro", "aris", "suzumiya", "kochiya", "inoue", "fate", "nami", "hunter", "tenryuu", "shirasaka", "astolfo", "caesar", "prinz", "marin", "toyosatomimi", "kafuu", "takarada", "hoshino", "clownpiece", "cynthia", "miyako", "darjeeling", "sangonomiya", "chisato", "rice", "ikazuchi", "cirno", "maribel", "mizumiya", "niko", "kikirara", "riona"]
 no_dropout_tokens = [
@@ -208,7 +203,7 @@ no_dropout_tokens = [
     "koma",
     # "pov",
     "censor",
-    "upside", # these are critical tags for image comprehension
+    "upside" # these are critical tags for image comprehension
     "guro",
     "scat",
     "gore",
@@ -407,46 +402,6 @@ def decrypt_json_file(encrypted_file, password):
     # Return the JSON data
     return json_data
 SKIP_PATH_CHECK = False
-def dropout_coocurrence(tokens):
-    assert isinstance(tokens, list), "tokens should be a list"
-    #CHAR_COOCCURRENCE_DROPOUT
-    tokens_underbar = [t.replace(" ", "_") for t in tokens]
-    character_prefix_map = {}
-    # if character: prefix exists, collect
-    for i, token in enumerate(tokens_underbar):
-        if "character:" in token:
-            char_name = token.split("character:")[1]
-            if char_name not in character_prefix_map:
-                character_prefix_map[char_name] = token
-            tokens_underbar[i] = char_name # remove character: prefix
-    # we will recover them after dropout
-    
-    char_tags = [t for t in tokens_underbar if t in CHAR_COOCCURRENCE_DROPOUT] # ["alice", ...]
-    if len(char_tags) == 0:
-        return tokens
-    merged_dict = {} # which holds token:prob max values
-    for token in tokens_underbar:
-        if token in char_tags:
-            continue
-        for char_tag in char_tags:
-            if token in CHAR_COOCCURRENCE_DROPOUT[char_tag]["tags"]:
-                merged_dict[token] = max(merged_dict.get(token, 0), CHAR_COOCCURRENCE_DROPOUT[char_tag]["tags"][token]["ratio"])
-    if len(merged_dict) == 0:
-        return tokens # no coocurrence
-    # dropout
-    selected = []
-    for token in tokens_underbar:
-        if token in merged_dict:
-            continue
-        if token in character_prefix_map:
-            selected.append(character_prefix_map[token])
-        else:
-            selected.append(token)
-    for token, prob in merged_dict.items():
-        if random.random() > prob:
-            selected.append(token)
-    log_every(f"CHAR_COOCCURRENCE_DROPOUT: {selected}, char_tags : {char_tags}", 25)
-    return selected
 def set_skip_path_check(skip):
     global SKIP_PATH_CHECK
     SKIP_PATH_CHECK = skip
@@ -673,6 +628,12 @@ class BaseSubset:
         min_adaptive_dropout: float = 0.0,
         max_adaptive_dropout: float = 0.0,
         adaptive_dropout_trigger_token: str = None,
+        step_based_dropout: bool = False,
+        step_dropout_schedule: str = "linear", # linear, cosine, "exponential"
+        step_dropout_start: float = 1.0,
+        step_dropout_end: float = 0.1,
+        step_dropout_warmup_ratio: float = 0.1,
+        use_warmup: bool = False,
     ) -> None:
         self.image_dir = image_dir
         self.num_repeats = num_repeats
@@ -702,6 +663,14 @@ class BaseSubset:
         self.max_dropout_rate = max_adaptive_dropout
         self.trigger_token = adaptive_dropout_trigger_token
         self.adaptive_dropout = adaptive_dropout
+
+        # Step-based dropout 
+        self.step_based_dropout = step_based_dropout
+        self.step_dropout_schedule = step_dropout_schedule
+        self.step_dropout_start = step_dropout_start
+        self.step_dropout_end = step_dropout_end
+        self.step_dropout_warmup_ratio = step_dropout_warmup_ratio
+        self.use_warmup = use_warmup
 
     def set_tag_frequency(self, captions):
         """
@@ -733,29 +702,30 @@ class BaseSubset:
         For intermediate frequencies, do a linear interpolation between min_dropout_rate and max_dropout_rate.
         """
         total_captions = self.tag_frequency.get("__total_captions__", 0)
-        
+
         # Controls how steep the sigmoid is around the center
         alpha = 10.0
         # The ratio value around which the sigmoid will transition from low to high
         center = 0.85
-        
+
         for tag, count in self.tag_frequency.items():
+            # Skip the special key
             if tag == "__total_captions__":
                 continue
 
             ratio = count / total_captions if total_captions != 0 else 0.0
 
-            # Sigmoid-like function centered at ratio = 0.85
+            # Linear interpolation between min_dropout_rate and max_dropout_rate:
+            # If ratio=1.0 => dropout ~ 0.85
+            # If ratio=0.0 => dropout ~ 0.1
+            # Sigmoid-like function cenetered at ratio = 0.85
             logistic = 1.0 / (1.0 + math.exp(-alpha * (ratio - center)))
-            
-            # Scale this logistic value between min_dropout_rate and max_dropout_rate
+
             dropout = (
-                self.min_dropout_rate +
-                (self.max_dropout_rate - self.min_dropout_rate) * logistic
+                self.min_dropout_rate
+                + (self.max_dropout_rate - self.min_dropout_rate) * logistic
             )
-            
             # Clamp in [0, 1] just in case
-            dropout = max(0.0, min(1.0, dropout))
             self.dropout_prob[tag] = dropout
 
     def process_caption_adaptive_dropout(self, caption: str, shuffle: bool = False) -> str:
@@ -795,6 +765,101 @@ class BaseSubset:
         # Join them back into a comma-separated string
         return ", ".join(new_tags)
 
+
+    def get_step_based_dropout_prob(self, current_step: int, max_train_steps: int) -> float:
+        if not self.step_based_dropout or max_train_steps <= 0:
+            return 0.0
+
+        p      = current_step / max_train_steps
+        start  = self.step_dropout_start
+        end    = self.step_dropout_end
+        k      = 5.0                              
+        sched  = self.step_dropout_schedule
+        use_wu = self.use_warmup                  
+        wu_st  = int(max_train_steps * self.step_dropout_warmup_ratio)
+
+
+        if sched == "jump_ramp":
+            if use_wu:
+                if current_step <= wu_st:
+                    ratio        = current_step / wu_st
+                    dropout_rate = start + (end - start) * ratio
+                else:
+                    dropout_rate = end
+            else:                                 
+                dropout_rate = end                
+
+        elif sched == "exp_up":
+            if use_wu and current_step < wu_st:
+                dropout_rate = start                
+            else:
+                progress     = p if not use_wu else (current_step - wu_st) / max(max_train_steps - wu_st, 1)
+                inc          = 1 - math.exp(-k * progress)
+                dropout_rate = start + (end - start) * inc
+
+        else:
+            if use_wu and current_step < wu_st:
+                dropout_rate = start
+            else:
+                progress     = p if not use_wu else (current_step - wu_st) / max(max_train_steps - wu_st, 1)
+                if sched == "linear":
+                    dropout_rate = start + (end - start) * progress
+                elif sched == "cosine":
+                    cos_factor   = 0.5 * (1 + math.cos(math.pi * (1 - progress)))
+                    dropout_rate = start + (end - start) * cos_factor
+                elif sched == "exponential":
+                    decay_factor = 1 - math.exp(-5 * progress)
+                    dropout_rate = start + (end - start) * decay_factor
+                else:
+                    dropout_rate = start + (end - start) * progress
+
+        return max(0.0, min(1.0, dropout_rate))
+
+
+    def process_caption_with_step_dropout(
+            self, caption: str,
+            current_step: int, max_train_steps: int,
+            shuffle: bool = False):
+
+        if not (self.step_based_dropout or self.adaptive_dropout):
+            return caption
+
+        tags       = [t.strip() for t in caption.split(",") if t.strip()]
+        new_tags   = []
+        step_prob  = self.get_step_based_dropout_prob(current_step, max_train_steps)
+
+        for tag in tags:
+            tag_l = tag.lower()
+
+            if self.trigger_token and self.trigger_token in tag_l:
+                new_tags.append(tag_l)
+                continue
+
+            adapt_prob = self.dropout_prob.get(tag_l, 0.0)
+            if self.step_based_dropout and self.adaptive_dropout:
+                final_prob = adapt_prob * step_prob 
+            elif self.step_based_dropout:
+                final_prob = step_prob
+            elif self.adaptive_dropout:
+                final_prob = adapt_prob
+            else:
+                final_prob = 0.0
+
+            if random.random() > final_prob:          
+                new_tags.append(tag_l)
+            else:                                    
+                info_file = getattr(self, "metadata_file", getattr(self, "image_dir", ""))
+                log_every(
+                    f"Dropped tag: {tag_l} "
+                    f"(step_prob={step_prob:.3f}, adapt_prob={adapt_prob:.3f}, "
+                    f"final_prob={final_prob:.3f}, step={current_step}) | {info_file}",
+                    1000
+                )
+        if shuffle:
+            random.shuffle(new_tags)
+
+        return ", ".join(new_tags)
+
 class DreamBoothSubset(BaseSubset):
     def __init__(
         self,
@@ -826,6 +891,12 @@ class DreamBoothSubset(BaseSubset):
         min_adaptive_dropout: float = 0.0,
         max_adaptive_dropout: float = 0.0,
         adaptive_dropout_trigger_token: str = None,
+        step_based_dropout: bool = False,
+        step_dropout_schedule: str = "linear",
+        step_dropout_start: float = 0.8,
+        step_dropout_end: float = 0.1,
+        step_dropout_warmup_ratio: float = 0.1,
+        use_warmup: bool = False,
     ) -> None:
         assert image_dir is not None, "image_dir must be specified / image_dirは指定が必須です"
 
@@ -854,6 +925,12 @@ class DreamBoothSubset(BaseSubset):
             min_adaptive_dropout,
             max_adaptive_dropout,
             adaptive_dropout_trigger_token,
+            step_based_dropout,
+            step_dropout_schedule,
+            step_dropout_start,
+            step_dropout_end,
+            step_dropout_warmup_ratio,
+            use_warmup,
         )
 
         self.is_reg = is_reg
@@ -897,6 +974,12 @@ class FineTuningSubset(BaseSubset):
         min_adaptive_dropout: float = 0.0,
         max_adaptive_dropout: float = 0.0,
         adaptive_dropout_trigger_token: str = None,
+        step_based_dropout: bool = False,
+        step_dropout_schedule: str = "linear",
+        step_dropout_start: float = 0.8,
+        step_dropout_end: float = 0.1,
+        step_dropout_warmup_ratio: float = 0.1,
+        use_warmup: bool = False,
     ) -> None:
         assert metadata_file is not None, "metadata_file must be specified / metadata_fileは指定が必須です"
 
@@ -925,6 +1008,12 @@ class FineTuningSubset(BaseSubset):
             min_adaptive_dropout,
             max_adaptive_dropout,
             adaptive_dropout_trigger_token,
+            step_based_dropout,
+            step_dropout_schedule,
+            step_dropout_start,
+            step_dropout_end,
+            step_dropout_warmup_ratio,
+            use_warmup,
         )
 
         self.metadata_file = metadata_file
@@ -1068,6 +1157,11 @@ class BaseDataset(torch.utils.data.Dataset):
         self.max_dropout_rate = 1
         self.trigger_token = None
 
+        self.step_dropout_schedule = "linear"
+        self.step_dropout_start = 0.8
+        self.step_dropout_end = 0.1
+        self.step_dropout_warmup_ratio = 0.1
+
     def set_seed(self, seed):
         self.seed = seed
 
@@ -1107,8 +1201,16 @@ class BaseDataset(torch.utils.data.Dataset):
             caption = subset.caption_prefix + " " + caption
         if subset.caption_suffix:
             caption = caption + " " + subset.caption_suffix
-        if subset.adaptive_dropout:
-            return subset.process_caption_adaptive_dropout(caption, shuffle=subset.shuffle_caption)
+
+        if subset.step_based_dropout and subset.adaptive_dropout:
+            return subset.process_caption_with_step_dropout(
+                caption, self.current_step, self.max_train_steps,
+                shuffle=subset.shuffle_caption
+            )
+        elif subset.adaptive_dropout:
+            return subset.process_caption_adaptive_dropout(
+                caption, shuffle=subset.shuffle_caption
+            )
         # dropoutの決定：tag dropがこのメソッド内にあるのでここで行うのが良い
         is_drop_out = subset.caption_dropout_rate > 0 and random.random() < subset.caption_dropout_rate
         is_drop_out = (
@@ -1182,7 +1284,6 @@ class BaseDataset(torch.utils.data.Dataset):
                     flex_tokens = flex_tokens[:tokens_len]
 
                 def dropout_tags(tokens):
-                    assert isinstance(tokens, list), f"tokens must be a list, but got {type(tokens)} with {tokens}"
                     # drop until token length gets smaller than 225 (hardcoded here)
                     if len(tokens) > 225:
                         while len(tokens) > 225:
@@ -1266,7 +1367,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
                 #if subset.shuffle_caption:
                 #    random.shuffle(flex_tokens)
-                flex_tokens = dropout_coocurrence(flex_tokens)
+
                 flex_tokens = dropout_tags(flex_tokens)
                 fixed_tokens, flex_tokens = convert_tags_if_needed(fixed_tokens), convert_tags_if_needed(flex_tokens)
                 # by random chance, use different join
@@ -2167,6 +2268,12 @@ class FineTuningDataset(BaseDataset):
         min_adaptive_dropout: float = 0.0,
         max_adaptive_dropout: float = 0.0,
         adaptive_dropout_trigger_token: str = None,
+        step_based_dropout: bool = False,
+        step_dropout_schedule: str = "linear",
+        step_dropout_start: float = 0.8,
+        step_dropout_end: float = 0.1,
+        step_dropout_warmup_ratio: float = 0.1,
+        use_warmup: bool = False,
     ) -> None:
         super().__init__(tokenizer, max_token_length, resolution, network_multiplier, debug_dataset)
 
@@ -2194,11 +2301,8 @@ class FineTuningDataset(BaseDataset):
                 if subset.metadata_file.endswith("_enc.json"):
                     metadata = decrypt_json_file(subset.metadata_file, "passwd")
                 else:
-                    #with open(subset.metadata_file, "rt", encoding="utf-8") as f:
-                        #metadata = json.load(f)
-                    # orjson
-                    with open(subset.metadata_file, "rb") as f:
-                        metadata = orjson.loads(f.read())
+                    with open(subset.metadata_file, "rt", encoding="utf-8") as f:
+                        metadata = json.load(f)
             else:
                 raise ValueError(f"no metadata / メタデータファイルがありません: {subset.metadata_file}")
 
@@ -2247,7 +2351,7 @@ class FineTuningDataset(BaseDataset):
                     if caption is None:
                         caption = tags
                     elif tags is not None and len(tags) > 0:
-                        caption = caption + ", " + tags
+                        caption = tags
                         tags_list.append(tags)
                     captions = [caption]
                 # Now, caption is not None
@@ -3502,8 +3606,6 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
         action="store_true",
         help="resume from huggingface (ex: --resume {repo_id}/{path_in_repo}:{revision}:{repo_type}) / huggingfaceから学習を再開する(例: --resume {repo_id}/{path_in_repo}:{revision}:{repo_type})",
     )
-    parser.add_argument("--fourier_loss_weight", type=float, default=0.0,
-                    help="Weight for the Fourier high-frequency loss (0 to disable). Recommended: 0.5?")
     parser.add_argument(
         "--async_upload",
         action="store_true",
@@ -3900,9 +4002,42 @@ def add_training_arguments(parser: argparse.ArgumentParser, support_dreambooth: 
         default=None,
         help="trigger token for adaptive dropout / adaptive dropoutのトリガートークン",
     )
-    
-    
-
+    parser.add_argument(
+        "--step_based_dropout",
+        action="store_true",
+        help="enable step-based dropout for caption",
+    )
+    parser.add_argument(
+        "--step_dropout_schedule",
+        type=str,
+        default="linear",
+        choices=["linear", "cosine", "exponential", "jump_ramp", "exp_up"],
+        help="schedule for step-based dropout",
+    )
+    parser.add_argument(
+        "--step_dropout_start",
+        type=float,
+        default=0.8,
+        help="initial dropout rate for step-based dropout"
+    )
+    parser.add_argument(
+        "--step_dropout_end",
+        type=float,
+        default=0.1,
+        help="final dropout rate for step-based dropout"
+    )
+    parser.add_argument(
+        "--step_dropout_warmup_ratio",
+        type=float,
+        default=0.1,
+        help="warmup ratio for step-based dropout"
+    )    
+    parser.add_argument(
+        "--use_warmup",
+        type=bool,
+        default=False,
+        help="use warmup for step-based dropout"
+    )
     # SAI Model spec
     parser.add_argument(
         "--metadata_title",
@@ -4219,7 +4354,6 @@ def add_dataset_arguments(
         default=None,
         help="dataset class for arbitrary dataset (package.module.Class) / 任意のデータセットを用いるときのクラス名 (package.module.Class)",
     )
-
     if support_caption_dropout:
         # Textual Inversion はcaptionのdropoutをsupportしない
         # いわゆるtensorのDropoutと紛らわしいのでprefixにcaptionを付けておく　every_n_epochsは他と平仄を合わせてdefault Noneに
@@ -5549,6 +5683,43 @@ def conditional_loss(
         raise NotImplementedError(f"Unsupported Loss Type {loss_type}")
     return loss
 
+def _entropy(p: torch.Tensor) -> torch.Tensor:
+    d = p.shape[-1]
+    h = -(p * p.clamp_min(1e-12).log()).sum(dim=-1)
+    return h / math.log(d)
+
+def _jsd(ps: torch.Tensor) -> torch.Tensor:
+    m = ps.mean(dim=-2)
+    kld = (ps * (ps.clamp_min(1e-12).log() - m.clamp_min(1e-12).log())).sum(dim=-1)
+    jsd = kld.mean(dim=-1)
+    n = ps.shape[-2]
+    return jsd / math.log(n)
+
+# https://arxiv.org/pdf/2505.19166v1
+def jedi_loss(groups: list[torch.Tensor], reduction: str = "mean", lam: float = 1.0) -> torch.Tensor:
+    # lam == lambda
+    # 1. 내부 토큰들 jsd 평균값
+    intra_terms = []
+    for g in groups:
+        if g.ndim == 1:
+            g = g.unsqueeze(0)
+        intra_terms.append(_jsd(g.unsqueeze(0)))
+    intra = torch.stack(intra_terms, dim=0) # (g, )
+    intra = intra.mean()
+
+    # 2. 그룹 별 분포들간 JSD
+    mixtures = torch.stack([g.mean(dim=0) if g.ndim > 1 else g for g in groups], dim=0)
+    inter = 1.0 - _jsd(mixtures.unsqueeze(0))
+
+    # 3. diversity regularization
+    div = lam * (1.0 - _entropy(mixtures.mean()))
+
+    loss = intra + inter + div
+
+    if reduction == "sum":
+        loss = loss * len(groups)
+
+    return loss
 
 def append_lr_to_logs(logs, lr_scheduler, optimizer_type, including_unet=True):
     names = []
