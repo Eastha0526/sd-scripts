@@ -3,6 +3,8 @@
 import argparse
 import json
 import glob
+from tqdm import tqdm
+
 
 def main(args):
     json_files = glob.glob(args.jsons)
@@ -10,7 +12,12 @@ def main(args):
     for json_file in json_files:
         with open(json_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            merged.update(data)
+            for key, values in tqdm(data.items()):
+                if key not in merged:
+                    merged[key] = data[key]
+                elif "train_resolution" in data[key]:
+                    merged[key].update(data[key])
+                    
     with open(args.out_json, 'w', encoding='utf-8') as f:
         json.dump(merged, f, separators=(',', ':'), ensure_ascii=False)
 

@@ -201,8 +201,6 @@ def train(args):
     logger.info(f"Waiting for everyone / 他のプロセスを待機中")
     accelerator.wait_for_everyone()
     logger.info("All processes are ready / すべてのプロセスが準備完了")
-    if args.seed is not None:
-        set_seed(args.seed + accelerator.local_process_index)
     # mixed precisionに対応した型を用意しておき適宜castする
     weight_dtype, save_dtype = train_util.prepare_dtype(args)
     vae_dtype = torch.float32 if args.no_half_vae else weight_dtype
@@ -787,7 +785,6 @@ def setup_parser() -> argparse.ArgumentParser:
     train_util.add_masked_loss_arguments(parser)
     deepspeed_utils.add_deepspeed_arguments(parser)
     train_util.add_sd_saving_arguments(parser)
-    #train_util.add_skip_check_arguments(parser)
     train_util.add_optimizer_arguments(parser)
     config_util.add_config_arguments(parser)
     custom_train_functions.add_custom_train_arguments(parser)
@@ -836,6 +833,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     train_util.verify_command_line_training_args(args)
     args = train_util.read_config_from_file(args, parser)
-    # if args.skip_file_existence_check:
-    #     train_util.set_skip_path_check(True)
+    if args.skip_file_existence_check:
+        train_util.set_skip_path_check(True)
     train(args)
