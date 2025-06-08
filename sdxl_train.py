@@ -12,7 +12,7 @@ from tqdm import tqdm
 import torch
 from library.device_utils import init_ipex, clean_memory_on_device
 
-
+import random
 init_ipex()
 
 from accelerate.utils import set_seed
@@ -121,9 +121,6 @@ def train(args):
     cache_latents = args.cache_latents
     use_dreambooth_method = args.in_json is None
 
-    if args.seed is not None:
-        set_seed(args.seed)  # 乱数系列を初期化する
-
     tokenizer1, tokenizer2 = sdxl_train_util.load_tokenizers(args)
 
     # データセットを準備する
@@ -204,7 +201,6 @@ def train(args):
     logger.info(f"Waiting for everyone / 他のプロセスを待機中")
     accelerator.wait_for_everyone()
     logger.info("All processes are ready / すべてのプロセスが準備完了")
-
     # mixed precisionに対応した型を用意しておき適宜castする
     weight_dtype, save_dtype = train_util.prepare_dtype(args)
     vae_dtype = torch.float32 if args.no_half_vae else weight_dtype
@@ -478,12 +474,17 @@ def train(args):
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0, disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
 
-    noise_scheduler = DDPMScheduler(
+    noise_scheduler_orig = DDPMScheduler(
         beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000, clip_sample=False
     )
-    prepare_scheduler_for_custom_training(noise_scheduler, accelerator.device)
+    noise_scheduler_non_ztsnr = DDPMScheduler(
+        beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000, clip_sample=False
+    )
     if args.zero_terminal_snr:
-        custom_train_functions.fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler)
+        custom_train_functions.fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler_orig, args.terminal_snr_value)
+    prepare_scheduler_for_custom_training(noise_scheduler_orig, accelerator.device)
+    prepare_scheduler_for_custom_training(noise_scheduler_non_ztsnr, accelerator.device)
+
 
     if accelerator.is_main_process:
         init_kwargs = {}
@@ -583,7 +584,11 @@ def train(args):
                 # concat embeddings
                 vector_embedding = torch.cat([pool2, embs], dim=1).to(weight_dtype)
                 text_embedding = torch.cat([encoder_hidden_states1, encoder_hidden_states2], dim=2).to(weight_dtype)
-
+                
+                if random.random() < args.ztsnr_rate: # use non-zero terminal snr for 5% of the steps which will help to stabilize training
+                    noise_scheduler = noise_scheduler_non_ztsnr
+                else:
+                    noise_scheduler = noise_scheduler_orig
                 # Sample noise, sample a random timestep for each image, and add noise to the latents,
                 # with noise offset and/or multires noise if specified
                 noise, noisy_latents, timesteps, huber_c = train_util.get_noise_noisy_latents_and_timesteps(args, noise_scheduler, latents)
@@ -593,8 +598,10 @@ def train(args):
                 # Predict the noise residual
                 with accelerator.autocast():
                     noise_pred = unet(noisy_latents, timesteps, text_embedding, vector_embedding)
-
-                target = noise
+                if args.v_parameterization:
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                else:
+                    target = noise
 
                 if (
                     args.min_snr_gamma
@@ -605,18 +612,21 @@ def train(args):
                 ):
                     # do not mean over batch dimension for snr weight or scale v-pred loss
                     loss = train_util.conditional_loss(noise_pred.float(), target.float(), reduction="none", loss_type=args.loss_type, huber_c=huber_c)
+                    if args.fourier_loss_weight > 0:
+                        freq_loss = fourier_highfreq_loss(noise_pred.float(), target.float(), reduction="mean")
+                        loss = loss + args.fourier_loss_weight * freq_loss
                     if args.masked_loss:
                         loss = apply_masked_loss(loss, batch)
                     loss = loss.mean([1, 2, 3])
 
                     if args.min_snr_gamma:
-                        loss = apply_snr_weight(loss, timesteps, noise_scheduler, args.min_snr_gamma)
+                        loss = apply_snr_weight(loss, timesteps, noise_scheduler, args.min_snr_gamma, args.v_parameterization)
                     if args.scale_v_pred_loss_like_noise_pred:
                         loss = scale_v_prediction_loss_like_noise_prediction(loss, timesteps, noise_scheduler)
                     if args.v_pred_like_loss:
                         loss = add_v_prediction_like_loss(loss, timesteps, noise_scheduler, args.v_pred_like_loss)
                     if args.debiased_estimation_loss:
-                        loss = apply_debiased_estimation(loss, timesteps, noise_scheduler)
+                        loss = apply_debiased_estimation(loss, timesteps, noise_scheduler, args.v_parameterization)
 
                     loss = loss.mean()  # mean over batch dimension
                 else:
@@ -775,7 +785,6 @@ def setup_parser() -> argparse.ArgumentParser:
     train_util.add_masked_loss_arguments(parser)
     deepspeed_utils.add_deepspeed_arguments(parser)
     train_util.add_sd_saving_arguments(parser)
-    train_util.add_skip_check_arguments(parser)
     train_util.add_optimizer_arguments(parser)
     config_util.add_config_arguments(parser)
     custom_train_functions.add_custom_train_arguments(parser)
@@ -786,6 +795,11 @@ def setup_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="learning rate for text encoder 1 (ViT-L) / text encoder 1 (ViT-L)の学習率",
+    )
+    parser.add_argument(
+        "--ztsnr_rate",
+        type=float,
+        default=0.025,
     )
     parser.add_argument(
         "--learning_rate_te2",

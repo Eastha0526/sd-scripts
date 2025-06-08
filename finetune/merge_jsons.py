@@ -5,6 +5,7 @@ import json
 import glob
 from tqdm import tqdm
 
+
 def main(args):
     json_files = glob.glob(args.jsons)
     merged = {}
@@ -16,6 +17,7 @@ def main(args):
                     merged[key] = data[key]
                 elif "train_resolution" in data[key]:
                     merged[key].update(data[key])
+                    
     with open(args.out_json, 'w', encoding='utf-8') as f:
         json.dump(merged, f, separators=(',', ':'), ensure_ascii=False)
 

@@ -145,7 +145,7 @@ class NetworkTrainer:
         cache_latents = args.cache_latents
         use_dreambooth_method = args.in_json is None
         use_user_config = args.dataset_config is not None
-
+        logger.info(f"args.dataset_config: {args.dataset_config}")
         if args.seed is None:
             args.seed = random.randint(0, 2**32)
         set_seed(args.seed)
@@ -169,7 +169,7 @@ class NetworkTrainer:
                     )
             else:
                 if use_dreambooth_method:
-                    logger.info("Using DreamBooth method.")
+                    print("Using DreamBooth method.", args.train_data_dir, args.reg_data_dir)
                     user_config = {
                         "datasets": [
                             {
@@ -179,6 +179,7 @@ class NetworkTrainer:
                             }
                         ]
                     }
+                    print("DreamBooth config:", user_config)
                 else:
                     logger.info("Training with captions.")
                     user_config = {
@@ -220,7 +221,6 @@ class NetworkTrainer:
             ), "when caching latents, either color_aug or random_crop cannot be used / latentをキャッシュするときはcolor_augとrandom_cropは使えません"
 
         self.assert_extra_args(args, train_dataset_group)
-
         # acceleratorを準備する
         logger.info("prepare accelerator")
         accelerator = train_util.prepare_accelerator(args)
@@ -273,7 +273,7 @@ class NetworkTrainer:
             vae.requires_grad_(False)
             vae.eval()
             with torch.no_grad():
-                train_dataset_group.cache_latents(vae, args.vae_batch_size, args.cache_latents_to_disk, accelerator.is_main_process)
+                train_dataset_group.cache_latents(accelerator, vae, args.vae_batch_size, args.cache_latents_to_disk, accelerator.is_main_process)
             vae.to("cpu")
             clean_memory_on_device(accelerator.device)
 
@@ -360,18 +360,26 @@ class NetworkTrainer:
             batch_size=1,
             shuffle=True,
             collate_fn=collator,
-            num_workers=n_workers,
+            num_workers=n_workers if not args.deepspeed else 1, # To avoid RuntimeError: DataLoader worker exited unexpectedly with exit code 1.
             persistent_workers=args.persistent_data_loader_workers,
         )
 
         # 学習ステップ数を計算する
         if args.max_train_epochs is not None:
-            args.max_train_steps = args.max_train_epochs * math.ceil(
-                len(train_dataloader) / accelerator.num_processes / args.gradient_accumulation_steps
-            )
-            accelerator.print(
-                f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
-            )
+            if args.deepspeed:
+                args.max_train_steps = args.max_train_epochs * math.ceil(
+                    len(train_dataloader) / args.gradient_accumulation_steps
+                )
+                accelerator.print(
+                    f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
+                )
+            else:
+                args.max_train_steps = args.max_train_epochs * math.ceil(
+                    len(train_dataloader) / accelerator.num_processes / args.gradient_accumulation_steps
+                )
+                accelerator.print(
+                    f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
+                )
 
         # データセット側にも学習ステップを送信
         train_dataset_group.set_max_train_steps(args.max_train_steps)

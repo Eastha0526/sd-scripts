@@ -1,29 +1,21 @@
 import argparse
+import glob
 import os
 import json
 
-import glob
 from pathlib import Path
 from typing import List
 from tqdm import tqdm
 import numpy as np
 from PIL import Image
 import cv2
-
 import torch
-from library.device_utils import init_ipex, get_preferred_device
-init_ipex()
-
 from torchvision import transforms
 
 import library.model_util as model_util
 import library.train_util as train_util
-from library.utils import setup_logging
-setup_logging()
-import logging
-logger = logging.getLogger(__name__)
 
-DEVICE = get_preferred_device()
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 IMAGE_TRANSFORMS = transforms.Compose(
     [
@@ -44,10 +36,13 @@ def collate_fn_remove_corrupted(batch):
 
 
 def get_npz_filename(data_dir, image_key, is_full_path, recursive):
+    if not data_dir:
+        assert is_full_path, "data_dir is required if is_full_path is False / data_dirは必須です"
+        assert os.path.exists(image_key) and os.path.isabs(image_key), f"image_key must be full path / image_keyはフルパスである必要があります: {image_key}"
+        image_base_name = image_key.rsplit(".", 1)[0]
+        return image_base_name + ".npz"
     if is_full_path:
-        ext = os.path.splitext(os.path.basename(image_key))[1]
-        return image_key.replace(ext, ".npz")
-        # why the fuck we need the next lines
+        base_name = os.path.splitext(os.path.basename(image_key))[0]
         relative_path = os.path.relpath(os.path.dirname(image_key), data_dir)
     else:
         base_name = image_key
@@ -66,6 +61,7 @@ def split_dataset(image_paths, n_split, current_index):
     if count < n_split:
         print(f"WARNING: dataset is too small for n_split / データセットが小さすぎます: {count} < {n_split}")
         return image_paths
+    image_paths = sorted(image_paths) # sort for reproducibility
     split_size = count // n_split
     start = split_size * current_index
     end = start + split_size
@@ -75,31 +71,21 @@ def split_dataset(image_paths, n_split, current_index):
     print(f"split dataset with length {count} into {n_split} parts, current_index: {current_index}, start: {start}, end: {end}")
     return image_paths[start:end]
 
+
 def main(args):
     # assert args.bucket_reso_steps % 8 == 0, f"bucket_reso_steps must be divisible by 8 / bucket_reso_stepは8で割り切れる必要があります"
     if args.bucket_reso_steps % 8 > 0:
-        logger.warning(f"resolution of buckets in training time is a multiple of 8 / 学習時の各bucketの解像度は8単位になります")
+        print(f"resolution of buckets in training time is a multiple of 8 / 学習時の各bucketの解像度は8単位になります")
     if args.bucket_reso_steps % 32 > 0:
-        logger.warning(
+        print(
             f"WARNING: bucket_reso_steps is not divisible by 32. It is not working with SDXL / bucket_reso_stepsが32で割り切れません。SDXLでは動作しません"
         )
-    if args.in_json and os.path.exists(args.in_json):
-        logger.info(f"loading existing metadata: {args.in_json}")
-        with open(args.in_json, "rt", encoding="utf-8") as f:
-            metadata = json.load(f)
-        print(f"loaded existing metadata: {len(metadata)}")
+    metadata = {}
+    if args.train_data_dir:
+        train_data_dir_path = Path(args.train_data_dir)
     else:
-        assert args.json_pattern or args.train_data_dir, "train_data_dir or json_pattern is required / train_data_dirかjson_patternが必要です"
-        metadata = {}
-    if not args.json_pattern and not args.train_data_dir:
-        if os.path.exists(args.in_json):
-            print(f"loading existing metadata: {args.in_json}")
-            with open(args.in_json, "rt", encoding="utf-8") as f:
-                metadata = json.load(f)
-        if not metadata:
-            print(f"no metadata / メタデータファイルがありません: {args.in_json}")
-            return
-        image_paths = list(metadata.keys())
+        assert args.json_pattern, "train_data_dir or json_pattern is required / train_data_dirかjson_patternが必要です"
+        train_data_dir_path = None
     if args.json_pattern:
         json_list = glob.glob(args.json_pattern)
         if len(json_list) == 0:
@@ -119,13 +105,11 @@ def main(args):
                     {
                         key : {"tag": value} for key, value in partial_metadata.items()
                     }
-                )
-        print(f"loaded metadata: {len(metadata)}")   
-    elif args.train_data_dir:
-        train_data_dir_path = Path(args.train_data_dir)
+                )       
+    else:
+        print(f"loading images from {train_data_dir_path}")
         image_paths: List[str] = [str(p) for p in train_util.glob_images_pathlib(train_data_dir_path, args.recursive)]
-        logger.info(f"found {len(image_paths)} images.")
-        metadata = {p: {} for p in image_paths}
+        print(f"found {len(image_paths)} images")
     if args.skip_existing:
         print("skip_existing is enabled, so it will skip images if npz already exists / skip_existingが有効なので、npzが既に存在する画像はスキップします")
         # check if npz exists'
@@ -154,7 +138,14 @@ def main(args):
                 key: metadata[key] for key in image_paths
             }
     print(f"found {len(image_paths)} images, metadata: {len(metadata)}")
-
+    if not args.json_pattern and not args.train_data_dir:
+        if os.path.exists(args.in_json):
+            print(f"loading existing metadata: {args.in_json}")
+            with open(args.in_json, "rt", encoding="utf-8") as f:
+                metadata = json.load(f)
+        elif not metadata:
+            print(f"no metadata / メタデータファイルがありません: {args.in_json}")
+            return
 
     weight_dtype = torch.float32
     if args.mixed_precision == "fp16":
@@ -176,7 +167,7 @@ def main(args):
     if not args.bucket_no_upscale:
         bucket_manager.make_buckets()
     else:
-        logger.warning(
+        print(
             "min_bucket_reso and max_bucket_reso are ignored if bucket_no_upscale is set, because bucket reso is defined by image size automatically / bucket_no_upscaleが指定された場合は、bucketの解像度は画像サイズから自動計算されるため、min_bucket_resoとmax_bucket_resoは無視されます"
         )
 
@@ -205,6 +196,8 @@ def main(args):
 
     bucket_counts = {}
     for data_entry in tqdm(data, smoothing=0.0):
+        if data_entry is None or len(data_entry) == 0:
+            continue
         if data_entry[0] is None:
             continue
 
@@ -215,9 +208,15 @@ def main(args):
             try:
                 image = Image.open(image_path)
                 if image.mode != "RGB":
-                    image = image.convert("RGB")
+                    # if RGBA, paste at white background
+                    if image.mode == "RGBA":
+                        white = Image.new("RGB", image.size, (255, 255, 255))
+                        white.paste(image, mask=image.split()[3])
+                        image = white
+                    else:
+                        image = image.convert("RGB")
             except Exception as e:
-                logger.error(f"Could not load image path / 画像を読み込めません: {image_path}, error: {e}")
+                print(f"Could not load image path / 画像を読み込めません: {image_path}, error: {e}")
                 continue
 
         image_key = image_path if args.full_path else os.path.splitext(os.path.basename(image_path))[0]
@@ -259,20 +258,20 @@ def main(args):
         image_info.resized_size = resized_size
         image_info.image = image
         bucket_manager.add_image(reso, image_info)
-
-        # バッチを推論するか判定して推論する
-        process_batch(False)
-
-    # 残りを処理する
-    process_batch(True)
+        if not args.metadata_only:
+            # バッチを推論するか判定して推論する
+            process_batch(False)
+    if not args.metadata_only:
+        # 残りを処理する
+        process_batch(True)
 
     bucket_manager.sort()
     for i, reso in enumerate(bucket_manager.resos):
         count = bucket_counts.get(reso, 0)
         if count > 0:
-            logger.info(f"bucket {i} {reso}: {count}")
+            print(f"bucket {i} {reso}: {count}")
     img_ar_errors = np.array(img_ar_errors)
-    logger.info(f"mean ar error: {np.mean(img_ar_errors)}")
+    print(f"mean ar error: {np.mean(img_ar_errors)}")
 
     # metadataを書き出して終わり
     if args.out_json:
@@ -295,6 +294,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model_name_or_path", type=str, help="model name or path to encode latents / latentを取得するためのモデル")
     parser.add_argument("--v2", action="store_true", help="not used (for backward compatibility) / 使用されません（互換性のため残してあります）")
     parser.add_argument("--batch_size", type=int, default=1, help="batch size in inference / 推論時のバッチサイズ")
+    parser.add_argument("--metadata_only", action="store_true", help="only update metadata / メタデータのみ更新する")
     parser.add_argument(
         "--max_data_loader_n_workers",
         type=int,
@@ -335,6 +335,11 @@ def setup_parser() -> argparse.ArgumentParser:
         help="skip images if npz already exists (both normal and flipped exists if flip_aug is enabled) / npzが既に存在する画像をスキップする（flip_aug有効時は通常、反転の両方が存在する画像をスキップ）",
     )
     parser.add_argument(
+        "--skip_caching_if_exists",
+        action="store_true",
+        help="skip caching latents if npz already exists (metadata won't be validated) / npzが既に存在する場合はlatentのキャッシュをスキップする（メタデータは検証されません）",
+    )
+    parser.add_argument(
         "--recursive",
         action="store_true",
         help="recursively look for training tags in all child folders of train_data_dir / train_data_dirのすべての子フォルダにある学習タグを再帰的に探す",
@@ -347,4 +352,5 @@ if __name__ == "__main__":
     parser = setup_parser()
 
     args = parser.parse_args()
+    DEVICE = torch.device(f"cuda:{args.cuda}" if torch.cuda.is_available() else "cpu")
     main(args)
