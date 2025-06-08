@@ -78,7 +78,17 @@ class BaseSubsetParams:
     caption_tag_dropout_rate: float = 0.0
     token_warmup_min: int = 1
     token_warmup_step: float = 0
-
+    multi_captions: bool = False
+    adaptive_dropout: bool = False
+    min_adaptive_dropout: float = 0.0
+    max_adaptive_dropout: float = 0.0
+    adaptive_dropout_trigger_token: str = None
+    step_based_dropout: bool = False
+    step_dropout_schedule: str = "linear"
+    step_dropout_start: float = 0.8
+    step_dropout_end: float = 0.1
+    step_dropout_warmup_ratio: float = 0.1
+    use_warmup: bool = False
 
 @dataclass
 class DreamBoothSubsetParams(BaseSubsetParams):
@@ -91,7 +101,6 @@ class DreamBoothSubsetParams(BaseSubsetParams):
 @dataclass
 class FineTuningSubsetParams(BaseSubsetParams):
     metadata_file: Optional[str] = None
-
 
 @dataclass
 class ControlNetSubsetParams(BaseSubsetParams):
@@ -107,7 +116,7 @@ class BaseDatasetParams:
     resolution: Optional[Tuple[int, int]] = None
     network_multiplier: float = 1.0
     debug_dataset: bool = False
-
+    multi_captions: bool = False
 
 @dataclass
 class DreamBoothDatasetParams(BaseDatasetParams):
@@ -128,6 +137,7 @@ class FineTuningDatasetParams(BaseDatasetParams):
     max_bucket_reso: int = 1024
     bucket_reso_steps: int = 64
     bucket_no_upscale: bool = False
+    multi_captions: bool = False
 
 
 @dataclass
@@ -151,12 +161,12 @@ class DatasetBlueprint:
     is_controlnet: bool
     params: Union[DreamBoothDatasetParams, FineTuningDatasetParams]
     subsets: Sequence[SubsetBlueprint]
+    multi_captions: bool = False
 
 
 @dataclass
 class DatasetGroupBlueprint:
     datasets: Sequence[DatasetBlueprint]
-
 
 @dataclass
 class Blueprint:
@@ -196,6 +206,16 @@ class ConfigSanitizer:
         "token_warmup_step": Any(float, int),
         "caption_prefix": str,
         "caption_suffix": str,
+        "adaptive_dropout": bool,
+        "min_adaptive_dropout": Any(float, int),
+        "max_adaptive_dropout": Any(float, int),
+        "adaptive_dropout_trigger_token": str,
+        "step_based_dropout": bool,
+        "step_dropout_schedule": str,
+        "step_dropout_start": Any(float, int),
+        "step_dropout_end": Any(float, int),
+        "step_dropout_warmup_ratio": Any(float, int),
+        "use_warmup": bool,
     }
     # DO means DropOut
     DO_SUBSET_ASCENDABLE_SCHEMA = {
@@ -237,6 +257,7 @@ class ConfigSanitizer:
         "min_bucket_reso": int,
         "resolution": functools.partial(__validate_and_convert_scalar_or_twodim.__func__, int),
         "network_multiplier": float,
+        "multi_captions": bool,
     }
 
     # options handled by argparse but not handled by user config
@@ -660,6 +681,7 @@ def load_user_config(file: str) -> dict:
     elif file.name.lower().endswith(".toml"):
         try:
             config = toml.load(file)
+            print(f"config {config}")
         except Exception:
             logger.error(
                 f"Error on parsing TOML config file. Please check the format. / TOML 形式の設定ファイルの読み込みに失敗しました。文法が正しいか確認してください。: {file}"
@@ -707,8 +729,12 @@ if __name__ == "__main__":
     logger.info("[sanitized_user_config]")
     logger.info(f"{sanitized_user_config}")
 
+    print(f" config {sanitizer_user_config}")
+
     blueprint = BlueprintGenerator(sanitizer).generate(user_config, argparse_namespace)
 
     logger.info("")
     logger.info("[blueprint]")
     logger.info(f"{blueprint}")
+
+    print(f" blueprint {blueprint}")
